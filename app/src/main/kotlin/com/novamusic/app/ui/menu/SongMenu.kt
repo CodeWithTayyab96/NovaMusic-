@@ -771,7 +771,7 @@ fun SongMenu(
                                     modifier =
                                         Modifier.clickable {
                                             onDismiss()
-                                            downloader.enqueue(
+                                            LocalFileDownloader.enqueue(
                                                 context,
                                                 song.id,
                                                 song.song.title,

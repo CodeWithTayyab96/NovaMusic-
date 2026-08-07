@@ -876,7 +876,7 @@ fun AlbumScreen(
                                         }
                                         else -> {
                                             albumWithSongs.songs.forEach { song ->
-                                                LocalFileDownloader.current.enqueue(
+                                                LocalFileDownloader.enqueue(
                                                     context,
                                                     song.id,
                                                     song.song.title,

@@ -100,6 +100,7 @@ fun AlbumMenu(
     val database = LocalDatabase.current
     val playerConnection = LocalPlayerConnection.current ?: return
     val scope = rememberCoroutineScope()
+    val downloader = LocalFileDownloader.current
     val libraryAlbum by database.album(originalAlbum.id).collectAsState(initial = originalAlbum)
     val album = libraryAlbum ?: originalAlbum
     var songs by remember {
@@ -120,7 +121,7 @@ fun AlbumMenu(
 
     LaunchedEffect(songs) {
         if (songs.isEmpty()) return@LaunchedEffect
-        LocalFileDownloader.current.progress.collect { progressMap ->
+        downloader.progress.collect { progressMap ->
             downloadState =
                 if (songs.all { it.song.isDownloadedByApp() }) {
                     STATE_COMPLETED
@@ -471,7 +472,7 @@ fun AlbumMenu(
                             onDismiss()
                             coroutineScope.launch(Dispatchers.IO) {
                                 songs.forEach { song ->
-                                    LocalFileDownloader.current.deleteLocalFile(song.id)
+                                    downloader.deleteLocalFile(song.id)
                                 }
                             }
                         }
@@ -488,7 +489,7 @@ fun AlbumMenu(
                         },
                         modifier = Modifier.clickable {
                             songs.forEach { song ->
-                                LocalFileDownloader.current.cancelWork(context, song.id)
+                                downloader.cancelWork(context, song.id)
                             }
                         }
                     )
@@ -504,7 +505,7 @@ fun AlbumMenu(
                         },
                         modifier = Modifier.clickable {
                             songs.forEach { song ->
-                                LocalFileDownloader.current.enqueue(
+                                LocalFileDownloader.enqueue(
                                     context,
                                     song.id,
                                     song.song.title,

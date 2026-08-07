@@ -87,6 +87,7 @@ fun PlaylistMenu(
     val context = LocalContext.current
     val database = LocalDatabase.current
     val playerConnection = LocalPlayerConnection.current ?: return
+    val downloader = LocalFileDownloader.current
     val dbPlaylist by database.playlist(playlist.id).collectAsState(initial = playlist)
     var songs by remember {
         mutableStateOf(emptyList<Song>())
@@ -112,7 +113,7 @@ fun PlaylistMenu(
 
     LaunchedEffect(songs) {
         if (songs.isEmpty()) return@LaunchedEffect
-        LocalFileDownloader.current.progress.collect { progressMap ->
+        downloader.progress.collect { progressMap ->
             downloadState =
                 if (songs.all { it.song.isDownloadedByApp() }) {
                     Download.STATE_COMPLETED
@@ -188,7 +189,7 @@ fun PlaylistMenu(
                         showRemoveDownloadDialog = false
                         coroutineScope.launch(Dispatchers.IO) {
                             songs.forEach { song ->
-                                LocalFileDownloader.current.deleteLocalFile(song.id)
+                                downloader.deleteLocalFile(song.id)
                             }
                         }
                     },
@@ -576,7 +577,7 @@ fun PlaylistMenu(
                                 },
                                 modifier = Modifier.clickable {
                                     songs.forEach { song ->
-                                        LocalFileDownloader.current.enqueue(
+                                        LocalFileDownloader.enqueue(
                                             context,
                                             song.id,
                                             song.song.title,

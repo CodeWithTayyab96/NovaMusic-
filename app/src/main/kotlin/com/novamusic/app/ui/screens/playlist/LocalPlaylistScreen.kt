@@ -898,7 +898,7 @@ fun LocalPlaylistScreen(
                                                 }
                                                 else -> {
                                                     songs.forEach { song ->
-                                                        LocalFileDownloader.current.enqueue(
+                                                        LocalFileDownloader.enqueue(
                                                             context,
                                                             song.song.id,
                                                             song.song.song.title,

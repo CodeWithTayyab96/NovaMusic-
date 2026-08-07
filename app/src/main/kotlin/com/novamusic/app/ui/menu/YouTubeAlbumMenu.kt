@@ -94,6 +94,7 @@ fun YouTubeAlbumMenu(
     val playerConnection = LocalPlayerConnection.current ?: return
     val album by database.albumWithSongs(albumItem.id).collectAsState(initial = null)
     val coroutineScope = rememberCoroutineScope()
+    val downloader = LocalFileDownloader.current
 
     LaunchedEffect(Unit) {
         database.album(albumItem.id).collect { album ->
@@ -118,7 +119,7 @@ fun YouTubeAlbumMenu(
     LaunchedEffect(album) {
         val songs = album?.songs ?: return@LaunchedEffect
         if (songs.isEmpty()) return@LaunchedEffect
-        LocalFileDownloader.current.progress.collect { progressMap ->
+        downloader.progress.collect { progressMap ->
             downloadState =
                 if (songs.all { it.song.isDownloadedByApp() }) {
                     Download.STATE_COMPLETED
@@ -444,7 +445,7 @@ fun YouTubeAlbumMenu(
                             onDismiss()
                             coroutineScope.launch(Dispatchers.IO) {
                                 album?.songs?.forEach { song ->
-                                    LocalFileDownloader.current.deleteLocalFile(song.id)
+                                    downloader.deleteLocalFile(song.id)
                                 }
                             }
                         }
@@ -461,7 +462,7 @@ fun YouTubeAlbumMenu(
                         },
                         modifier = Modifier.clickable {
                             album?.songs?.forEach { song ->
-                                LocalFileDownloader.current.cancelWork(context, song.id)
+                                downloader.cancelWork(context, song.id)
                             }
                         }
                     )
@@ -477,7 +478,7 @@ fun YouTubeAlbumMenu(
                         },
                         modifier = Modifier.clickable {
                             album?.songs?.forEach { song ->
-                                LocalFileDownloader.current.enqueue(
+                                LocalFileDownloader.enqueue(
                                     context,
                                     song.id,
                                     song.song.title,

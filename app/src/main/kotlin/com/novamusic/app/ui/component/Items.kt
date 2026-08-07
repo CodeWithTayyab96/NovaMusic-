@@ -1010,6 +1010,7 @@ fun AlbumListItem(
             Icon.Download(metadata.downloadState)
         } else {
             val database = LocalDatabase.current
+            val downloader = LocalFileDownloader.current
             var songs by remember {
                 mutableStateOf(emptyList<Song>())
             }
@@ -1026,7 +1027,7 @@ fun AlbumListItem(
 
             LaunchedEffect(songs) {
                 if (songs.isEmpty()) return@LaunchedEffect
-                LocalFileDownloader.current.progress.collect { progressMap ->
+                downloader.progress.collect { progressMap ->
                     downloadState = when {
                         songs.all { it.song.isDownloadedByApp() } -> STATE_COMPLETED
                         songs.all {
@@ -1085,6 +1086,7 @@ fun AlbumGridItem(
             Icon.Download(metadata.downloadState)
         } else {
             val database = LocalDatabase.current
+            val downloader = LocalFileDownloader.current
             var songs by remember { mutableStateOf(emptyList<Song>()) }
 
             LaunchedEffect(Unit) {
@@ -1095,7 +1097,7 @@ fun AlbumGridItem(
 
             LaunchedEffect(songs) {
                 if (songs.isEmpty()) return@LaunchedEffect
-                LocalFileDownloader.current.progress.collect { progressMap ->
+                downloader.progress.collect { progressMap ->
                     downloadState = when {
                         songs.all { it.song.isDownloadedByApp() } -> STATE_COMPLETED
                         songs.all {

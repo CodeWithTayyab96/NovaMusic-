@@ -10,7 +10,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.novamusic.app.di.LocalFileDownloaderEntryPoint
-import dagger.hilt.EntryPointAccessors
+import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.CancellationException
 
 /**

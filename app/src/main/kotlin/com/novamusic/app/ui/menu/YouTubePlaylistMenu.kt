@@ -109,6 +109,7 @@ fun YouTubePlaylistMenu(
     val database = LocalDatabase.current
     val playerConnection = LocalPlayerConnection.current ?: return
     val syncUtils = LocalSyncUtils.current
+    val downloader = LocalFileDownloader.current
     val dbPlaylist by database.playlistByBrowseId(playlist.id).collectAsState(initial = null)
 
     var showChoosePlaylistDialog by rememberSaveable { mutableStateOf(false) }
@@ -226,7 +227,7 @@ fun YouTubePlaylistMenu(
     }
     LaunchedEffect(songs, downloadedIds) {
         if (songs.isEmpty()) return@LaunchedEffect
-        LocalFileDownloader.current.progress.collect { progressMap ->
+        downloader.progress.collect { progressMap ->
             downloadState =
                 if (songs.all { it.id in downloadedIds })
                     Download.STATE_COMPLETED
@@ -267,7 +268,7 @@ fun YouTubePlaylistMenu(
                         showRemoveDownloadDialog = false
                         coroutineScope.launch(Dispatchers.IO) {
                             songs.forEach { song ->
-                                LocalFileDownloader.current.deleteLocalFile(song.id)
+                                downloader.deleteLocalFile(song.id)
                             }
                         }
                     }
@@ -724,7 +725,7 @@ fun YouTubePlaylistMenu(
                                                 YouTube.playlist(playlist.id).completed().getOrNull()?.songs.orEmpty()
                                             }
                                         }.forEach { song ->
-                                            LocalFileDownloader.current.enqueue(
+                                            LocalFileDownloader.enqueue(
                                                 context,
                                                 song.id,
                                                 song.title,

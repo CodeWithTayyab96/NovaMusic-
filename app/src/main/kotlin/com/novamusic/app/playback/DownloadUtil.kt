@@ -51,15 +51,15 @@ import javax.inject.Singleton
 class DownloadUtil
 @Inject
 constructor(
-    @ApplicationContext context: Context,
+    @ApplicationContext appContext: Context,
     val database: MusicDatabase,
     val databaseProvider: DatabaseProvider,
     @DownloadCache val downloadCache: Cache,
     @PlayerCache val playerCache: Cache,
 ) {
-    private val connectivityManager = context.getSystemService<ConnectivityManager>()!!
-    private val audioQuality by enumPreference(context, AudioQualityKey, AudioQuality.AUTO)
-    private val preferredStreamClient by enumPreference(context, PlayerStreamClientKey, PlayerStreamClient.ANDROID_VR)
+    private val connectivityManager = appContext.getSystemService<ConnectivityManager>()!!
+    private val audioQuality by enumPreference(appContext, AudioQualityKey, AudioQuality.AUTO)
+    private val preferredStreamClient by enumPreference(appContext, PlayerStreamClientKey, PlayerStreamClient.ANDROID_VR)
     private val songUrlCache = HashMap<String, Pair<String, Long>>()
     private val avoidStreamCodecs: Set<String> by lazy {
         if (deviceSupportsMimeType("audio/opus")) emptySet() else setOf("opus")
@@ -133,7 +133,7 @@ constructor(
         songUrlCache[mediaId]?.takeIf { it.second > System.currentTimeMillis() }?.let {
             return it.first
         }
-        val networkMeteredPref = context.dataStore.get(NetworkMeteredKey, true)
+        val networkMeteredPref = appContext.dataStore.get(NetworkMeteredKey, true)
         val playbackData = YTPlayerUtils.playerResponseForPlayback(
             mediaId,
             audioQuality = audioQuality,
@@ -185,11 +185,11 @@ constructor(
     }
 
     val downloadNotificationHelper =
-        DownloadNotificationHelper(context, ExoDownloadService.CHANNEL_ID)
+        DownloadNotificationHelper(appContext, ExoDownloadService.CHANNEL_ID)
 
     val downloadManager: DownloadManager =
         DownloadManager(
-            context,
+            appContext,
             databaseProvider,
             downloadCache,
             dataSourceFactory,

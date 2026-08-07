@@ -79,6 +79,7 @@ fun SelectionSongMenu(
     val coroutineScope = rememberCoroutineScope()
     val playerConnection = LocalPlayerConnection.current ?: return
     val syncUtils = LocalSyncUtils.current
+    val downloader = LocalFileDownloader.current
 
     val allInLibrary by remember {
         mutableStateOf(
@@ -111,7 +112,7 @@ fun SelectionSongMenu(
 
     LaunchedEffect(songSelection, downloadedIds) {
         if (songSelection.isEmpty()) return@LaunchedEffect
-        LocalFileDownloader.current.progress.collect { progressMap ->
+        downloader.progress.collect { progressMap ->
             downloadState =
                 if (songSelection.all { it.id in downloadedIds }) {
                     Download.STATE_COMPLETED
@@ -183,7 +184,7 @@ fun SelectionSongMenu(
                         showRemoveDownloadDialog = false
                         coroutineScope.launch(Dispatchers.IO) {
                             songSelection.forEach { song ->
-                                LocalFileDownloader.current.deleteLocalFile(song.id)
+                                downloader.deleteLocalFile(song.id)
                             }
                         }
                     },
@@ -427,7 +428,7 @@ fun SelectionSongMenu(
                         },
                         modifier = Modifier.clickable {
                             songSelection.forEach { song ->
-                                LocalFileDownloader.current.enqueue(
+                                LocalFileDownloader.enqueue(
                                     context,
                                     song.id,
                                     song.song.title,
@@ -515,6 +516,7 @@ fun SelectionMediaMetadataMenu(
     val database = LocalDatabase.current
     val coroutineScope = rememberCoroutineScope()
     val playerConnection = LocalPlayerConnection.current ?: return
+    val downloader = LocalFileDownloader.current
 
     val allLiked by remember(songSelection) {
         mutableStateOf(songSelection.isNotEmpty() && songSelection.all { it.liked })
@@ -563,7 +565,7 @@ fun SelectionMediaMetadataMenu(
 
     LaunchedEffect(songSelection, downloadedIds) {
         if (songSelection.isEmpty()) return@LaunchedEffect
-        LocalFileDownloader.current.progress.collect { progressMap ->
+        downloader.progress.collect { progressMap ->
             downloadState =
                 if (songSelection.all { it.id in downloadedIds }) {
                     Download.STATE_COMPLETED
@@ -608,7 +610,7 @@ fun SelectionMediaMetadataMenu(
                         showRemoveDownloadDialog = false
                         coroutineScope.launch(Dispatchers.IO) {
                             songSelection.forEach { song ->
-                                LocalFileDownloader.current.deleteLocalFile(song.id)
+                                downloader.deleteLocalFile(song.id)
                             }
                         }
                     },
@@ -798,7 +800,7 @@ fun SelectionMediaMetadataMenu(
                         },
                         modifier = Modifier.clickable {
                             songSelection.forEach { song ->
-                                LocalFileDownloader.current.enqueue(
+                                LocalFileDownloader.enqueue(
                                     context,
                                     song.id,
                                     song.title,

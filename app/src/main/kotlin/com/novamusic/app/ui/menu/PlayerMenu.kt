@@ -618,7 +618,7 @@ fun ColumnScope.PlayerMenu(
                             modifier = Modifier.clickable {
                                 onDismiss()
                                 database.transaction { insert(mediaMetadata) }
-                                downloader.enqueue(
+                                LocalFileDownloader.enqueue(
                                     context,
                                     mediaMetadata.id,
                                     mediaMetadata.title,

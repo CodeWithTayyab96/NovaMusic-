@@ -461,7 +461,7 @@ fun YouTubeSongMenu(
                             database.transaction {
                                 insert(song.toMediaMetadata())
                             }
-                            LocalFileDownloader.current.enqueue(
+                            LocalFileDownloader.enqueue(
                                 context,
                                 song.id,
                                 song.title,
