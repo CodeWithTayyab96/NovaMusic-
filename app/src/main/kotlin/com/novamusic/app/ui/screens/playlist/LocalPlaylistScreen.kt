@@ -114,6 +114,7 @@ import kotlinx.coroutines.withContext
 import com.novamusic.app.LocalDatabase
 import com.novamusic.app.LocalDownloadUtil
 import com.novamusic.app.LocalFileDownloader
+import com.novamusic.app.playback.LocalFileDownloader as LocalFileDownloaderImpl
 import com.novamusic.app.LocalPlayerAwareWindowInsets
 import com.novamusic.app.LocalPlayerConnection
 import com.novamusic.app.R
@@ -898,7 +899,7 @@ fun LocalPlaylistScreen(
                                                 }
                                                 else -> {
                                                     songs.forEach { song ->
-                                                        LocalFileDownloader.enqueue(
+                                                        LocalFileDownloaderImpl.enqueue(
                                                             context,
                                                             song.song.id,
                                                             song.song.song.title,

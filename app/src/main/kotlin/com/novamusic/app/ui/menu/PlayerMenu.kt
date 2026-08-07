@@ -92,6 +92,7 @@ import coil3.compose.AsyncImage
 import com.novamusic.app.innertube.YouTube
 import com.novamusic.app.LocalDatabase
 import com.novamusic.app.LocalFileDownloader
+import com.novamusic.app.playback.LocalFileDownloader as LocalFileDownloaderImpl
 import com.novamusic.app.LocalPlayerConnection
 import com.novamusic.app.R
 import com.novamusic.app.constants.ArtistSeparatorsKey
@@ -618,7 +619,7 @@ fun ColumnScope.PlayerMenu(
                             modifier = Modifier.clickable {
                                 onDismiss()
                                 database.transaction { insert(mediaMetadata) }
-                                LocalFileDownloader.enqueue(
+                                LocalFileDownloaderImpl.enqueue(
                                     context,
                                     mediaMetadata.id,
                                     mediaMetadata.title,

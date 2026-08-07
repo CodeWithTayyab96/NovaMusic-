@@ -70,6 +70,7 @@ import com.novamusic.app.innertube.YouTube
 import com.novamusic.app.LocalDatabase
 import com.novamusic.app.LocalFileDownloader
 import com.novamusic.app.playback.LocalDownloadState
+import com.novamusic.app.playback.LocalFileDownloader as LocalFileDownloaderImpl
 import com.novamusic.app.LocalPlayerConnection
 import com.novamusic.app.R
 import com.novamusic.app.constants.ArtistSeparatorsKey
@@ -505,7 +506,7 @@ fun AlbumMenu(
                         },
                         modifier = Modifier.clickable {
                             songs.forEach { song ->
-                                LocalFileDownloader.enqueue(
+                                LocalFileDownloaderImpl.enqueue(
                                     context,
                                     song.id,
                                     song.song.title,

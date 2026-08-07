@@ -60,6 +60,7 @@ constructor(
     private val connectivityManager = appContext.getSystemService<ConnectivityManager>()!!
     private val audioQuality by enumPreference(appContext, AudioQualityKey, AudioQuality.AUTO)
     private val preferredStreamClient by enumPreference(appContext, PlayerStreamClientKey, PlayerStreamClient.ANDROID_VR)
+    private val settingsDataStore = appContext.dataStore
     private val songUrlCache = HashMap<String, Pair<String, Long>>()
     private val avoidStreamCodecs: Set<String> by lazy {
         if (deviceSupportsMimeType("audio/opus")) emptySet() else setOf("opus")
@@ -133,7 +134,7 @@ constructor(
         songUrlCache[mediaId]?.takeIf { it.second > System.currentTimeMillis() }?.let {
             return it.first
         }
-        val networkMeteredPref = appContext.dataStore.get(NetworkMeteredKey, true)
+        val networkMeteredPref = settingsDataStore.get(NetworkMeteredKey, true)
         val playbackData = YTPlayerUtils.playerResponseForPlayback(
             mediaId,
             audioQuality = audioQuality,

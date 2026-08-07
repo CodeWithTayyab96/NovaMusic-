@@ -48,6 +48,7 @@ import androidx.media3.exoplayer.offline.Download
 import com.novamusic.app.LocalDatabase
 import com.novamusic.app.LocalFileDownloader
 import com.novamusic.app.playback.LocalDownloadState
+import com.novamusic.app.playback.LocalFileDownloader as LocalFileDownloaderImpl
 import com.novamusic.app.LocalPlayerConnection
 import com.novamusic.app.LocalSyncUtils
 import com.novamusic.app.R
@@ -428,7 +429,7 @@ fun SelectionSongMenu(
                         },
                         modifier = Modifier.clickable {
                             songSelection.forEach { song ->
-                                LocalFileDownloader.enqueue(
+                                LocalFileDownloaderImpl.enqueue(
                                     context,
                                     song.id,
                                     song.song.title,
@@ -800,7 +801,7 @@ fun SelectionMediaMetadataMenu(
                         },
                         modifier = Modifier.clickable {
                             songSelection.forEach { song ->
-                                LocalFileDownloader.enqueue(
+                                LocalFileDownloaderImpl.enqueue(
                                     context,
                                     song.id,
                                     song.title,

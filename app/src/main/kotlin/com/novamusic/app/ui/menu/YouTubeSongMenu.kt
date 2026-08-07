@@ -62,6 +62,7 @@ import com.novamusic.app.innertube.models.SongItem
 import com.novamusic.app.LocalDatabase
 import com.novamusic.app.LocalFileDownloader
 import com.novamusic.app.playback.LocalDownloadState
+import com.novamusic.app.playback.LocalFileDownloader as LocalFileDownloaderImpl
 import com.novamusic.app.LocalPlayerConnection
 import com.novamusic.app.LocalSyncUtils
 import com.novamusic.app.R
@@ -461,7 +462,7 @@ fun YouTubeSongMenu(
                             database.transaction {
                                 insert(song.toMediaMetadata())
                             }
-                            LocalFileDownloader.enqueue(
+                            LocalFileDownloaderImpl.enqueue(
                                 context,
                                 song.id,
                                 song.title,
