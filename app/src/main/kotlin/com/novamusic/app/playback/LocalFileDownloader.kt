@@ -8,8 +8,10 @@ package com.novamusic.app.playback
 
 import android.content.ContentValues
 import android.content.Context
+import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.util.Log
 import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
@@ -20,13 +22,19 @@ import com.novamusic.app.db.MusicDatabase
 import com.novamusic.app.db.entities.SongEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import okhttp3.Request
 import okio.Buffer
+import java.io.File
 import java.io.IOException
+import java.io.InputStream
 import java.time.LocalDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -73,6 +81,14 @@ constructor(
     private val _progress = MutableStateFlow<Map<String, LocalDownloadState>>(emptyMap())
     val progress: StateFlow<Map<String, LocalDownloadState>> = _progress.asStateFlow()
 
+    init {
+        // One-time startup cleanup: drop MediaStore entries + Room flags for app
+        // downloads whose file is missing, empty, or clearly not audio.
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching { purgeCorruptedLocalFiles() }
+        }
+    }
+
     /**
      * Downloads the raw audio stream for [songId] and stores it as a real file.
      * Meant to be called from a WorkManager worker.
@@ -91,11 +107,41 @@ constructor(
             val request = Request.Builder().url(streamUrl).build()
             downloadUtil.mediaOkHttpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    throw IOException("HTTP ${response.code} while downloading $songId")
+                    throw IOException(
+                        "HTTP ${response.code} while downloading $songId " +
+                            "(Content-Type: ${response.header("Content-Type") ?: "unknown"})",
+                    )
                 }
                 val body = response.body ?: throw IOException("Empty response body for $songId")
                 val contentLength = body.contentLength()
-                val mimeType = response.header("Content-Type") ?: "audio/mpeg"
+
+                // Validate the response is actually audio before writing anything to disk.
+                // YouTube's CDN can answer 200 with an HTML/JSON error page instead of the
+                // stream (expired URL, rejected client, bot check); saving that as a .m4a
+                // is what produced the "None of the available extractors could read the
+                // stream" corrupt files.
+                val rawContentType = response.header("Content-Type") ?: ""
+                val contentMime = rawContentType.substringBefore(';').trim().lowercase()
+                // resolveStreamUrl persists the chosen format on the query executor
+                // fire-and-forget, so drain it before reading the expected mime back.
+                val expectedMime = runCatching {
+                    database.awaitIdle()
+                    database.format(songId).first()?.mimeType
+                }.getOrNull()
+                if (!isPlausibleAudioContentType(contentMime, expectedMime)) {
+                    val detail =
+                        "HTTP ${response.code} | Content-Type: \"$rawContentType\" | " +
+                            "expected audio, got non-audio (known format: ${expectedMime ?: "unknown"})"
+                    Log.e(TAG, "Refusing to save non-audio response for $songId: $detail")
+                    throw IOException("Non-audio response for $songId: $detail")
+                }
+                if (contentLength == 0L) {
+                    val detail = "HTTP ${response.code} | Content-Type: \"$rawContentType\" | empty body"
+                    Log.e(TAG, "Empty download response for $songId: $detail")
+                    throw IOException("Empty download response for $songId: $detail")
+                }
+
+                val mimeType = contentMime.ifEmpty { expectedMime ?: "audio/mpeg" }
 
                 val displayName =
                     "${sanitizeFileName(safeTitle)} - ${sanitizeFileName(artist)}.${extensionForMime(mimeType)}"
@@ -235,15 +281,147 @@ constructor(
         _progress.update { map -> map - songId }
     }
 
-    private fun queryDataColumn(uri: android.net.Uri): String? = runCatching {
+    private fun queryDataColumn(uri: Uri): String? = runCatching {
         val projection = arrayOf(MediaStore.Audio.Media.DATA)
         context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
             if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getString(0) else null
         }
     }.getOrNull()
 
+    /**
+     * Scans songs marked as app-downloaded (isLocal=true, path under Music/NovaMusic)
+     * and removes the MediaStore entry + resets the Room flags whenever the underlying
+     * file is missing, empty, or clearly not audio (i.e. a corrupted download).
+     * Returns the number of entries purged.
+     */
+    suspend fun purgeCorruptedLocalFiles(): Int {
+        val active = _progress.value.filterValues {
+            it.state == LocalDownloadState.State.QUEUED || it.state == LocalDownloadState.State.DOWNLOADING
+        }.keys
+        val localSongs = database.withTransaction { getLocalSongsBlocking() }
+        val purged = localSongs.filter { song -> song.id !in active && isCorruptLocalFile(song.localPath.orEmpty()) }
+        if (purged.isEmpty()) return 0
+
+        purged.forEach { song -> song.localPath?.let { deleteMediaStoreEntry(it) } }
+        database.withTransaction {
+            for (song in purged) {
+                // Skip individually: a row removed concurrently must not void the
+                // flag reset for the remaining songs.
+                val current = getSongByIdBlocking(song.id)?.song ?: continue
+                update(current.copy(isLocal = false, localPath = null))
+            }
+        }
+        Log.i(TAG, "Purged ${purged.size} corrupted local download(s): ${purged.joinToString { it.id }}")
+        return purged.size
+    }
+
+    private fun isCorruptLocalFile(localPath: String): Boolean {
+        if (localPath.isBlank()) return true // isLocal=true but no path — broken state
+        val uri = runCatching { Uri.parse(localPath) }.getOrNull() ?: return false
+        val path = localFilePath(localPath)
+        if (path.isNotEmpty() && !path.contains(FOLDER_NAME, ignoreCase = true)) {
+            // Not an app download (scanned library music lives elsewhere) — leave it alone.
+            return false
+        }
+        val file = if (path.isNotEmpty()) File(path) else null
+        if (file != null && !file.exists()) return true
+
+        val length =
+            if (file != null) {
+                file.length()
+            } else {
+                // If the size can't be determined (MediaStore not ready at startup,
+                // row not indexed yet), leave the entry alone — never purge on a
+                // failed read, only on a *definite* corrupt state.
+                runCatching {
+                    context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length }
+                }.getOrNull() ?: return false
+            }
+        if (length < MIN_VALID_FILE_SIZE) return true
+
+        val stream =
+            runCatching {
+                file?.inputStream() ?: context.contentResolver.openInputStream(uri)
+            }.getOrNull() ?: return false // can't read it — don't risk a false purge
+        return stream.use { input -> !sniffAudioHeader(input) }
+    }
+
+    /**
+     * Resolves a stored [localPath] (content:// uri, file:// uri, or plain path) to
+     * a real filesystem path when possible; empty string when it can't be resolved.
+     */
+    private fun localFilePath(localPath: String): String {
+        val uri = runCatching { Uri.parse(localPath) }.getOrNull() ?: return localPath
+        return when (uri.scheme) {
+            "content" -> queryDataColumn(uri).orEmpty()
+            "file" -> uri.path.orEmpty()
+            else -> localPath
+        }
+    }
+
+    private fun deleteMediaStoreEntry(localPath: String) {
+        runCatching {
+            val uri = Uri.parse(localPath)
+            when (uri.scheme) {
+                "content" -> context.contentResolver.delete(uri, null, null)
+                else -> {
+                    val file = if (uri.scheme == "file") File(uri.path.orEmpty()) else File(localPath)
+                    if (file.exists()) file.delete()
+                }
+            }
+        }
+    }
+
+    private fun isPlausibleAudioContentType(contentMime: String, expectedMime: String?): Boolean {
+        if (contentMime.isEmpty()) return true // no header — nothing to judge, fall back to expected
+        if (contentMime.startsWith("audio/")) return true
+        // Definite error-page / non-audio payloads.
+        if (
+            contentMime.startsWith("text/") ||
+            contentMime.startsWith("image/") ||
+            contentMime.startsWith("application/json") ||
+            contentMime.startsWith("application/xml") ||
+            contentMime.startsWith("application/x-www-form-urlencoded")
+        ) {
+            return false
+        }
+        val expected = expectedMime?.lowercase()
+        if (expected != null && expected.startsWith("audio/")) {
+            // CDNs sometimes label audio-only webm/mp4 streams as video/* or octet-stream.
+            if (contentMime.startsWith("video/")) return true
+            if (contentMime == "application/octet-stream") return true
+            return contentMime == expected
+        }
+        return false
+    }
+
+    /**
+     * Cheap magic-byte check: true when the stream looks like a known audio container
+     * (mp3/ID3, flac, ogg/opus, wav, aiff, m4a/ftyp, webm/EBML, MPEG/ADTS frame sync).
+     */
+    private fun sniffAudioHeader(input: InputStream): Boolean {
+        val header = ByteArray(16)
+        val n = input.read(header)
+        if (n < 4) return false
+        fun ascii(offset: Int, text: String): Boolean {
+            val signature = text.toByteArray(Charsets.US_ASCII)
+            if (offset + signature.size > n) return false
+            return signature.indices.all { i -> header[offset + i] == signature[i] }
+        }
+        return ascii(0, "ID3") ||
+            ascii(0, "fLaC") ||
+            ascii(0, "OggS") ||
+            ascii(0, "RIFF") ||
+            ascii(0, "FORM") ||
+            ascii(4, "ftyp") ||
+            (header[0] == 0x1A.toByte() && header[1] == 0x45.toByte() && header[2] == 0xDF.toByte() && header[3] == 0xA3.toByte()) ||
+            (header[0] == 0xFF.toByte() && (header[1].toInt() and 0xE0) == 0xE0)
+    }
+
     companion object {
+        private const val TAG = "LocalFileDownloader"
         private const val BUFFER_SIZE = 64L * 1024L
+        private const val MIN_VALID_FILE_SIZE = 8L * 1024L
         private const val FOLDER_NAME = "NovaMusic"
 
         fun uniqueWorkName(songId: String) = "local-download-$songId"

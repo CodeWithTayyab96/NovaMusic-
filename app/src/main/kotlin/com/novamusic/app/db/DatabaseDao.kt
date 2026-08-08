@@ -192,6 +192,10 @@ interface DatabaseDao {
     fun localSongs(): Flow<List<Song>>
 
     @Transaction
+    @Query("SELECT * FROM song WHERE isLocal")
+    fun getLocalSongsBlocking(): List<SongEntity>
+
+    @Transaction
     @Query("SELECT * FROM song WHERE liked ORDER BY rowId")
     fun likedSongsByRowIdAsc(): Flow<List<Song>>
 
