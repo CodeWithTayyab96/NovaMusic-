@@ -68,4 +68,4 @@ jobs:
       # Runs assemble + unit tests (+ lint, which has abortOnError=false here)
       # for every ABI flavor / build type. Slow but comprehensive.
       - name: Build all variants + run unit tests
-        run: ./gradlew build --no-daemon --stacktrace
+        run: ./gradlew build --no-daemon --stacktrace --no-parallel --max-workers=2
