@@ -198,6 +198,15 @@
         </receiver>
 
         <receiver
+            android:name=".playback.DownloadCancelReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.novamusic.app.action.CANCEL_LOCAL_DOWNLOAD" />
+                <action android:name="com.novamusic.app.action.CANCEL_ALL_LOCAL_DOWNLOADS" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
             android:name=".widget.NovaMusicPlayerWidgetReceiver"
             android:exported="true"
             android:label="@string/app_name">

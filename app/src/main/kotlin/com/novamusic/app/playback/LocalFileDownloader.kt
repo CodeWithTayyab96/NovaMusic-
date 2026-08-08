@@ -10,6 +10,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
 import android.os.Build
+import android.os.SystemClock
 import android.provider.MediaStore
 import android.util.Log
 import androidx.work.Constraints
@@ -92,17 +93,32 @@ constructor(
     /**
      * Downloads the raw audio stream for [songId] and stores it as a real file.
      * Meant to be called from a WorkManager worker.
+     *
+     * [onProgress] is invoked on each throttled progress emission (at most every
+     * [PROGRESS_EMIT_INTERVAL_MS] or every [PROGRESS_EMIT_DELTA] progress change) and
+     * always on the terminal QUEUED/DOWNLOADING/COMPLETED/FAILED transitions, so callers
+     * can drive a notification without spamming updates.
      */
-    suspend fun download(songId: String, title: String, artist: String) {
+    suspend fun download(
+        songId: String,
+        title: String,
+        artist: String,
+        onProgress: (suspend (LocalDownloadState) -> Unit)? = null,
+    ) {
         val safeTitle = title.ifBlank { songId }
-        _progress.update { map ->
-            map + (songId to LocalDownloadState(songId, safeTitle, artist, LocalDownloadState.State.QUEUED))
-        }
+        val queued = LocalDownloadState(songId, safeTitle, artist, LocalDownloadState.State.QUEUED)
+        _progress.update { map -> map + (songId to queued) }
+        onProgress?.invoke(queued)
         try {
             val streamUrl = downloadUtil.resolveStreamUrl(songId)
-            _progress.update { map ->
-                map[songId]?.let { map + (songId to it.copy(state = LocalDownloadState.State.DOWNLOADING)) } ?: map
-            }
+            val downloading = LocalDownloadState(
+                songId = songId,
+                title = safeTitle,
+                artist = artist,
+                state = LocalDownloadState.State.DOWNLOADING,
+            )
+            _progress.update { map -> map + (songId to downloading) }
+            onProgress?.invoke(downloading)
 
             val request = Request.Builder().url(streamUrl).build()
             downloadUtil.mediaOkHttpClient.newCall(request).execute().use { response ->
@@ -169,6 +185,14 @@ constructor(
                         body.source().use { input ->
                             val buffer = Buffer()
                             var bytesDownloaded = 0L
+                            // Progress throttling: updating _progress copies the whole map and
+                            // triggers recomposition across every screen observing it. Firing on
+                            // every 64KB buffer read (dozens of times per second) was the cause of
+                            // app-wide slowness during downloads. Emit at most every 250ms OR every
+                            // 2% progress change, whichever comes first. Terminal states below are
+                            // not throttled and always emit.
+                            var lastEmitAt = 0L
+                            var lastEmittedProgress = -1f
                             while (true) {
                                 val read = input.read(buffer, BUFFER_SIZE)
                                 if (read == -1L) break
@@ -180,15 +204,22 @@ constructor(
                                     } else {
                                         0f
                                     }
-                                _progress.update { map ->
-                                    map[songId]?.let {
-                                        map + (songId to it.copy(
-                                            state = LocalDownloadState.State.DOWNLOADING,
-                                            progress = p,
-                                            bytesDownloaded = bytesDownloaded,
-                                            totalBytes = contentLength,
-                                        ))
-                                    } ?: map
+                                val now = SystemClock.elapsedRealtime()
+                                val progressDelta = p - lastEmittedProgress
+                                if (now - lastEmitAt >= PROGRESS_EMIT_INTERVAL_MS || progressDelta >= PROGRESS_EMIT_DELTA) {
+                                    lastEmitAt = now
+                                    lastEmittedProgress = p
+                                    val state = LocalDownloadState(
+                                        songId = songId,
+                                        title = safeTitle,
+                                        artist = artist,
+                                        state = LocalDownloadState.State.DOWNLOADING,
+                                        progress = p,
+                                        bytesDownloaded = bytesDownloaded,
+                                        totalBytes = contentLength,
+                                    )
+                                    _progress.update { map -> map + (songId to state) }
+                                    onProgress?.invoke(state)
                                 }
                             }
                         }
@@ -213,15 +244,16 @@ constructor(
                         upsert(updated)
                     }
 
-                    _progress.update { map ->
-                        map[songId]?.let {
-                            map + (songId to it.copy(
-                                state = LocalDownloadState.State.COMPLETED,
-                                progress = 1f,
-                                localPath = localPath,
-                            ))
-                        } ?: map
-                    }
+                    val completed = LocalDownloadState(
+                        songId = songId,
+                        title = safeTitle,
+                        artist = artist,
+                        state = LocalDownloadState.State.COMPLETED,
+                        progress = 1f,
+                        localPath = localPath,
+                    )
+                    _progress.update { map -> map + (songId to completed) }
+                    onProgress?.invoke(completed)
                 } catch (e: Exception) {
                     // Roll back the pending MediaStore entry on failure/cancellation.
                     runCatching { context.contentResolver.delete(uri, null, null) }
@@ -231,17 +263,15 @@ constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            _progress.update { map ->
-                map + (songId to (map[songId] ?: LocalDownloadState(
-                    songId,
-                    safeTitle,
-                    artist,
-                    LocalDownloadState.State.FAILED,
-                )).copy(
-                    state = LocalDownloadState.State.FAILED,
-                    error = e.message,
-                ))
-            }
+            val failed = LocalDownloadState(
+                songId = songId,
+                title = safeTitle,
+                artist = artist,
+                state = LocalDownloadState.State.FAILED,
+                error = e.message,
+            )
+            _progress.update { map -> map + (songId to failed) }
+            onProgress?.invoke(failed)
             throw e
         }
     }
@@ -423,6 +453,8 @@ constructor(
         private const val BUFFER_SIZE = 64L * 1024L
         private const val MIN_VALID_FILE_SIZE = 8L * 1024L
         private const val FOLDER_NAME = "NovaMusic"
+        const val PROGRESS_EMIT_INTERVAL_MS = 250L
+        const val PROGRESS_EMIT_DELTA = 0.02f
 
         fun uniqueWorkName(songId: String) = "local-download-$songId"
 
