@@ -519,7 +519,7 @@ constructor(
         }
     }
 
-    /** Maps a file extension back to a sensible audio/* MIME type for MediaStore. */
+    /** Maps a file extension back to a sensible audio MIME type for MediaStore. */
     private fun mimeForExtension(extension: String): String = when (extension) {
         "webm" -> "audio/webm"
         "ogg" -> "audio/ogg"
