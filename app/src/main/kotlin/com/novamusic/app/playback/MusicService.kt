@@ -694,7 +694,7 @@ class MusicService :
                 CHANNEL_ID,
                 R.string.music_player
             ).apply {
-                setSmallIcon(R.drawable.opentune)
+                setSmallIcon(R.drawable.opentune_monochrome)
             }
         )
         
