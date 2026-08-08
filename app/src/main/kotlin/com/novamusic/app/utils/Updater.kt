@@ -18,8 +18,6 @@ import com.novamusic.app.constants.GitHubReleasesEtagKey
 import com.novamusic.app.constants.GitHubReleasesFingerprintKey
 import com.novamusic.app.constants.GitHubReleasesJsonKey
 import com.novamusic.app.constants.GitHubReleasesLastCheckedAtKey
-import com.novamusic.app.constants.UpdateChannel
-import com.novamusic.app.constants.UpdateChannelKey
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -36,7 +34,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -59,13 +56,6 @@ data class ReleaseInfo(
     val htmlUrl: String
 )
 
-data class NightlyInfo(
-    val versionName: String,
-    val apkUrl: String,
-    val changelog: String?,
-    val publishedAt: String
-)
-
 data class UpdateInfo(
     val tagName: String,
     val versionName: String,
@@ -76,7 +66,6 @@ data class UpdateInfo(
 )
 
 private const val APK_ASSET_NAME = "app-universal-release.apk"
-private const val NIGHTLY_JSON_URL = "https://pub-2218e6bbd5b948e1b5d882cf4d92086d.r2.dev/update.json"
 
 private data class ReleasesNetworkResult(
     val status: HttpStatusCode,
@@ -89,8 +78,6 @@ object Updater {
     private const val ReleaseCacheCheckIntervalMs: Long = 6 * 60 * 60 * 1000L
     var lastCheckTime = -1L
         private set
-
-    private var cachedNightlyInfo: NightlyInfo? = null
 
     private data class SemVer(
         val major: Int,
@@ -248,7 +235,7 @@ object Updater {
         cachedEtag: String?,
     ): ReleasesNetworkResult {
         val response: HttpResponse =
-            client.get("https://api.github.com/repos/Arturo254/OpenTune/releases?per_page=$perPage") {
+            client.get("https://api.github.com/repos/CodeWithTayyab96/NovaMusic-/releases?per_page=$perPage") {
                 headers {
                     append("Accept", "application/vnd.github+json")
                     append("User-Agent", "OpenTune")
@@ -274,43 +261,9 @@ object Updater {
         }
     }
 
-    // ─── Canal helpers ─────────────────────────────────────────────────────────
-
-    private suspend fun getCurrentUpdateChannel(): UpdateChannel {
-        val channelName = App.instance.dataStore.getAsync(UpdateChannelKey) ?: UpdateChannel.STABLE.name
-        return runCatching { UpdateChannel.valueOf(channelName) }.getOrDefault(UpdateChannel.STABLE)
-    }
-
-    private suspend fun fetchNightlyJson(): Result<NightlyInfo> = runCatching {
-        val response = client.get(NIGHTLY_JSON_URL) {
-            headers {
-                append("Accept", "application/json")
-                append("User-Agent", "OpenTune")
-            }
-        }.bodyAsText()
-        val json = JSONObject(response)
-
-        // El JSON está en /nightly/update.json pero el APK debe servirse sin /nightly/
-        val rawApkUrl = json.optString("apkUrl", "")
-        val fixedApkUrl = rawApkUrl.replace(
-            "https://pub-2218e6bbd5b948e1b5d882cf4d92086d.r2.dev/",
-            "https://pub-2218e6bbd5b948e1b5d882cf4d92086d.r2.dev/"
-        )
-
-        NightlyInfo(
-            versionName = json.optString("versionName", "unknown"),
-            apkUrl = fixedApkUrl.ifEmpty {
-                "https://pub-2218e6bbd5b948e1b5d882cf4d92086d.r2.dev/app-universal-release.apk"
-            },
-            changelog = json.optString("changelog", "").takeIf { it.isNotEmpty() },
-            publishedAt = json.optString("publishedAt", "")
-        )
-    }
-
     // ─── Funciones públicas (compatibilidad obligatoria) ───────────────────────
 
     suspend fun getCachedReleases(): List<ReleaseInfo> {
-        if (getCurrentUpdateChannel() == UpdateChannel.NIGHTLY) return emptyList()
         val cachedJson = App.instance.dataStore.getAsync(GitHubReleasesJsonKey)
         return cachedJson
             ?.takeIf { it.isNotBlank() }
@@ -319,45 +272,20 @@ object Updater {
     }
 
     suspend fun getLatestVersionName(): Result<String> = runCatching {
-        when (getCurrentUpdateChannel()) {
-            UpdateChannel.STABLE -> {
-                val latest = getLatestReleaseInfo().getOrThrow()
-                preferredReleaseVersionNameOrNull(latest) ?: latest.name.ifBlank { latest.tagName }
-            }
-            UpdateChannel.NIGHTLY -> {
-                fetchNightlyJson().getOrThrow().versionName
-            }
-        }
+        val latest = getLatestReleaseInfo().getOrThrow()
+        preferredReleaseVersionNameOrNull(latest) ?: latest.name.ifBlank { latest.tagName }
     }
 
     suspend fun getLatestReleaseNotes(): Result<String?> = runCatching {
-        when (getCurrentUpdateChannel()) {
-            UpdateChannel.STABLE -> getLatestReleaseInfo().getOrThrow().body
-            UpdateChannel.NIGHTLY -> fetchNightlyJson().getOrThrow().changelog
-        }
+        getLatestReleaseInfo().getOrThrow().body
     }
 
     suspend fun getLatestReleaseInfo(): Result<ReleaseInfo> = runCatching {
-        when (getCurrentUpdateChannel()) {
-            UpdateChannel.STABLE -> {
-                val releases = getAllReleases().getOrThrow()
-                val latest = findLatestRelease(releases)
-                    ?: throw IllegalStateException("No releases found")
-                lastCheckTime = System.currentTimeMillis()
-                latest
-            }
-            UpdateChannel.NIGHTLY -> {
-                val nightly = fetchNightlyJson().getOrThrow()
-                cachedNightlyInfo = nightly
-                ReleaseInfo(
-                    tagName = nightly.versionName,
-                    name = nightly.versionName,
-                    body = nightly.changelog,
-                    publishedAt = nightly.publishedAt,
-                    htmlUrl = nightly.apkUrl
-                )
-            }
-        }
+        val releases = getAllReleases().getOrThrow()
+        val latest = findLatestRelease(releases)
+            ?: throw IllegalStateException("No releases found")
+        lastCheckTime = System.currentTimeMillis()
+        latest
     }
 
     // ─── Comprobación de actualización ─────────────────────────────────────────
@@ -367,10 +295,7 @@ object Updater {
      */
     suspend fun checkForUpdate(currentVersionName: String): Result<UpdateInfo?> =
         runCatching {
-            when (getCurrentUpdateChannel()) {
-                UpdateChannel.STABLE -> checkForUpdateStable(currentVersionName)
-                UpdateChannel.NIGHTLY -> checkForUpdateNightly(currentVersionName)
-            }
+            checkForUpdateStable(currentVersionName)
         }
 
     private suspend fun checkForUpdateStable(currentVersionName: String): UpdateInfo? {
@@ -393,30 +318,13 @@ object Updater {
         )
     }
 
-    private suspend fun checkForUpdateNightly(currentVersionName: String): UpdateInfo? {
-        val nightly = fetchNightlyJson().getOrThrow()
-        return if (isSameVersion(nightly.versionName, currentVersionName)) {
-            null
-        } else {
-            cachedNightlyInfo = nightly
-            UpdateInfo(
-                tagName        = nightly.versionName,
-                versionName    = nightly.versionName,
-                downloadUrl    = nightly.apkUrl,
-                releasePageUrl = nightly.apkUrl,
-                releaseNotes   = nightly.changelog,
-                publishedAt    = nightly.publishedAt,
-            )
-        }
-    }
-
     private suspend fun resolveApkDownloadUrl(tagName: String): String {
         val fallback =
-            "https://github.com/Arturo254/OpenTune/releases/download/$tagName/$APK_ASSET_NAME"
+            "https://github.com/CodeWithTayyab96/NovaMusic-/releases/download/$tagName/$APK_ASSET_NAME"
 
         return runCatching {
             val response = client.get(
-                "https://api.github.com/repos/Arturo254/OpenTune/releases/tags/$tagName"
+                "https://api.github.com/repos/CodeWithTayyab96/NovaMusic-/releases/tags/$tagName"
             ) {
                 headers {
                     append("Accept", "application/vnd.github+json")
@@ -482,7 +390,7 @@ object Updater {
     suspend fun getCommitHistory(count: Int = 20, branch: String = "master"): Result<List<GitCommit>> =
         runCatching {
             val response =
-                client.get("https://api.github.com/repos/Arturo254/OpenTune/commits?sha=$branch&per_page=$count") {
+                client.get("https://api.github.com/repos/CodeWithTayyab96/NovaMusic-/commits?sha=$branch&per_page=$count") {
                     headers {
                         append("Accept", "application/vnd.github+json")
                         append("User-Agent", "OpenTune")
@@ -507,30 +415,14 @@ object Updater {
             commits
         }
 
-    fun getLatestDownloadUrl(): String {
-        val channel = runBlocking {
-            kotlin.runCatching { getCurrentUpdateChannel() }.getOrDefault(UpdateChannel.STABLE)
-        }
-        return when (channel) {
-            UpdateChannel.STABLE -> {
-                "https://github.com/Arturo254/OpenTune/releases/latest/download/$APK_ASSET_NAME"
-            }
-            UpdateChannel.NIGHTLY -> {
-                cachedNightlyInfo?.apkUrl
-                    ?: "https://pub-2218e6bbd5b948e1b5d882cf4d92086d.r2.dev/app-universal-release.apk"
-            }
-        }
-    }
+    fun getLatestDownloadUrl(): String =
+        "https://github.com/CodeWithTayyab96/NovaMusic-/releases/latest/download/$APK_ASSET_NAME"
 
     suspend fun getAllReleases(
         perPage: Int = 30,
         forceRefresh: Boolean = false,
     ): Result<List<ReleaseInfo>> =
         runCatching {
-            if (getCurrentUpdateChannel() == UpdateChannel.NIGHTLY) {
-                return@runCatching emptyList()
-            }
-
             val now = System.currentTimeMillis()
             val cachedJson = App.instance.dataStore.getAsync(GitHubReleasesJsonKey)
             val cachedEtag = App.instance.dataStore.getAsync(GitHubReleasesEtagKey)

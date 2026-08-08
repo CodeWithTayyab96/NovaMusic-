@@ -24,20 +24,13 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import kotlinx.coroutines.launch
 import com.novamusic.app.LocalPlayerAwareWindowInsets
-import com.novamusic.app.constants.UpdateChannel
-import com.novamusic.app.constants.UpdateChannelKey
 import com.novamusic.app.ui.component.IconButton
 import com.novamusic.app.ui.component.MarkdownText
 import com.novamusic.app.ui.utils.backToMain
-import com.novamusic.app.utils.NightlyInfo
 import com.novamusic.app.utils.ReleaseInfo
 import com.novamusic.app.utils.Updater
-import com.novamusic.app.utils.dataStore
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import java.text.SimpleDateFormat
 import java.util.Locale
-import androidx.compose.ui.platform.LocalLocale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,76 +41,35 @@ fun ChangelogScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    // Estado para el canal actual
-    var updateChannel by remember { mutableStateOf(UpdateChannel.STABLE) }
-
     // Estados para releases estables
     var releases by remember { mutableStateOf<List<ReleaseInfo>>(emptyList()) }
-
-    // Estado para nightly
-    var nightlyInfo by remember { mutableStateOf<NightlyInfo?>(null) }
 
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    // Cargar el canal actual desde DataStore
-    LaunchedEffect(Unit) {
-        updateChannel = context.dataStore.data.map {
-            it[UpdateChannelKey]?.let { value ->
-                try {
-                    UpdateChannel.valueOf(value)
-                } catch (e: Exception) {
-                    UpdateChannel.STABLE
-                }
-            } ?: UpdateChannel.STABLE
-        }.first()
-    }
-
-    // Función para cargar el contenido según el canal
+    // Función para cargar el contenido
     suspend fun loadContent() {
-        if (updateChannel == UpdateChannel.NIGHTLY) {
-            // Solo para NIGHTLY usar getLatestReleaseInfo
-            Updater.getLatestReleaseInfo().onSuccess { releaseInfo ->
-                nightlyInfo = NightlyInfo(
-                    versionName = releaseInfo.tagName,
-                    apkUrl = "",
-                    changelog = releaseInfo.body,
-                    publishedAt = releaseInfo.publishedAt
-                )
-                error = null
-            }.onFailure { e ->
-                if (nightlyInfo == null) {
-                    error = e.message ?: "Error loading nightly info"
-                }
+        Updater.getAllReleases(forceRefresh = true).onSuccess { result ->
+            releases = result
+            error = null
+            isLoading = false
+        }.onFailure { e ->
+            if (releases.isEmpty()) {
+                error = e.message ?: "Error loading releases"
             }
             isLoading = false
-        } else {
-            // Para STABLE, NO usar getLatestReleaseInfo, solo getAllReleases
-            Updater.getAllReleases(forceRefresh = true).onSuccess { result ->
-                releases = result
-                error = null
-                isLoading = false
-            }.onFailure { e ->
-                if (releases.isEmpty()) {
-                    error = e.message ?: "Error loading releases"
-                }
-                isLoading = false
-            }
         }
     }
 
-    // Cargar datos iniciales cuando el canal cambie
-    LaunchedEffect(updateChannel) {
+    // Cargar datos iniciales (usando caché primero)
+    LaunchedEffect(Unit) {
         isLoading = true
         error = null
 
-        if (updateChannel == UpdateChannel.STABLE) {
-            // Intentar usar caché primero para releases estables
-            val cachedReleases = Updater.getCachedReleases()
-            if (cachedReleases.isNotEmpty()) {
-                releases = cachedReleases
-                isLoading = false
-            }
+        val cachedReleases = Updater.getCachedReleases()
+        if (cachedReleases.isNotEmpty()) {
+            releases = cachedReleases
+            isLoading = false
         }
 
         loadContent()
@@ -127,12 +79,7 @@ fun ChangelogScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        if (updateChannel == UpdateChannel.NIGHTLY)
-                            "Nightly Changelog"
-                        else
-                            stringResource(R.string.changelog)
-                    )
+                    Text(stringResource(R.string.changelog))
                 },
                 navigationIcon = {
                     IconButton(
@@ -165,9 +112,7 @@ fun ChangelogScreen(
                         modifier = Modifier.align(Alignment.Center)
                     )
                 }
-                error != null &&
-                        ((updateChannel == UpdateChannel.STABLE && releases.isEmpty()) ||
-                                (updateChannel == UpdateChannel.NIGHTLY && nightlyInfo == null)) -> {
+                error != null && releases.isEmpty() -> {
                     Column(
                         modifier = Modifier
                             .align(Alignment.Center)
@@ -191,26 +136,7 @@ fun ChangelogScreen(
                         }
                     }
                 }
-
-                updateChannel == UpdateChannel.NIGHTLY && nightlyInfo != null -> {
-                    // Mostrar contenido nightly
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        item { Spacer(modifier = Modifier.height(8.dp)) }
-
-                        item {
-                            NightlyChangelogCard(nightlyInfo = nightlyInfo!!)
-                        }
-
-                        item { Spacer(modifier = Modifier.height(8.dp)) }
-                    }
-                }
-
-                updateChannel == UpdateChannel.STABLE && releases.isEmpty() -> {
+                releases.isEmpty() -> {
                     Text(
                         text = stringResource(R.string.no_releases),
                         modifier = Modifier
@@ -219,8 +145,7 @@ fun ChangelogScreen(
                         style = MaterialTheme.typography.bodyLarge
                     )
                 }
-
-                updateChannel == UpdateChannel.STABLE -> {
+                else -> {
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
@@ -236,73 +161,6 @@ fun ChangelogScreen(
                         item { Spacer(modifier = Modifier.height(8.dp)) }
                     }
                 }
-            }
-        }
-    }
-}
-
-@SuppressLint("NonObservableLocale")
-@Composable
-private fun NightlyChangelogCard(nightlyInfo: NightlyInfo) {
-    // Soporte para formato dd-MM-yyyy (como "30-05-2026")
-    val inputDateFormat1 = SimpleDateFormat("dd-MM-yyyy", LocalLocale.current.platformLocale)
-    val inputDateFormat2 = SimpleDateFormat("yyyy-MM-dd", LocalLocale.current.platformLocale)
-    val displayDateFormat = SimpleDateFormat("MMMM d, yyyy", LocalLocale.current.platformLocale)
-
-    val formattedDate = remember(nightlyInfo.publishedAt) {
-        try {
-            // Intentar con dd-MM-yyyy primero
-            val date = inputDateFormat1.parse(nightlyInfo.publishedAt)
-                ?: inputDateFormat2.parse(nightlyInfo.publishedAt)
-            date?.let { displayDateFormat.format(it) } ?: nightlyInfo.publishedAt
-        } catch (e: Exception) {
-            nightlyInfo.publishedAt
-        }
-    }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Nightly ${nightlyInfo.versionName}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = formattedDate,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Mostrar el changelog con soporte Markdown
-            if (!nightlyInfo.changelog.isNullOrBlank()) {
-                MarkdownText(
-                    markdown = nightlyInfo.changelog,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            } else {
-                Text(
-                    text = "No changelog available for this nightly build.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         }
     }

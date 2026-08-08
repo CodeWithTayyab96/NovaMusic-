@@ -90,9 +90,6 @@ import com.novamusic.app.BuildConfig
 import com.novamusic.app.LocalPlayerAwareWindowInsets
 import com.novamusic.app.R
 import com.novamusic.app.constants.EnableUpdateNotificationKey
-import com.novamusic.app.constants.UpdateChannel
-import com.novamusic.app.constants.UpdateChannelKey
-import com.novamusic.app.ui.component.EnumListPreference
 import com.novamusic.app.ui.component.IconButton
 import com.novamusic.app.ui.component.MarkdownText
 import com.novamusic.app.ui.component.PreferenceGroupTitle
@@ -102,7 +99,6 @@ import com.novamusic.app.utils.GitCommit
 import com.novamusic.app.utils.UpdateInfo
 import com.novamusic.app.utils.UpdateNotificationManager
 import com.novamusic.app.utils.Updater
-import com.novamusic.app.utils.rememberEnumPreference
 import com.novamusic.app.utils.rememberPreference
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -129,15 +125,8 @@ fun UpdateScreen(
     val uriHandler = LocalUriHandler.current
     val coroutineScope = rememberCoroutineScope()
 
-    var nightlyInstallUrl by remember {
-        mutableStateOf("https://pub-2218e6bbd5b948e1b5d882cf4d92086d.r2.dev/app-universal-release.apk")
-    }
-
     val (enableUpdateNotification, onEnableUpdateNotificationChange) = rememberPreference(
         EnableUpdateNotificationKey, defaultValue = false
-    )
-    val (updateChannel, onUpdateChannelChange) = rememberEnumPreference(
-        UpdateChannelKey, defaultValue = UpdateChannel.STABLE
     )
 
     var commits by remember { mutableStateOf<List<GitCommit>>(emptyList()) }
@@ -152,7 +141,6 @@ fun UpdateScreen(
     var downloadProgress by remember { mutableFloatStateOf(0f) }
     var isDownloading by remember { mutableStateOf(false) }
 
-    var showNightlyConfirmDialog by remember { mutableStateOf(false) }
     var showNotifConfirmDialog by remember { mutableStateOf(false) }
     var hasNotificationPermission by remember {
         mutableStateOf(
@@ -231,31 +219,11 @@ fun UpdateScreen(
         )
     }
 
-    if (showNightlyConfirmDialog) {
-        BuildChannelInfoDialog(
-            title = stringResource(R.string.channel_nightly),
-            onConfirm = { showNightlyConfirmDialog = false; onUpdateChannelChange(UpdateChannel.NIGHTLY) },
-            onDismiss = { showNightlyConfirmDialog = false }
-        )
-    }
-
     LaunchedEffect(Unit) {
         coroutineScope.launch {
             Updater.getLatestVersionName().onSuccess { latestVersion = it }
             Updater.getCommitHistory(30).onSuccess { commits = it }.onFailure { commits = emptyList() }
             isLoadingCommits = false
-        }
-    }
-
-    LaunchedEffect(updateChannel) {
-        if (updateChannel == UpdateChannel.NIGHTLY) {
-            coroutineScope.launch {
-                Updater.getLatestReleaseInfo().onSuccess { info ->
-                    nightlyInstallUrl = info.htmlUrl
-                }
-            }
-        } else {
-            nightlyInstallUrl = "https://pub-2218e6bbd5b948e1b5d882cf4d92086d.r2.dev/app-universal-release.apk"
         }
     }
 
@@ -381,26 +349,6 @@ fun UpdateScreen(
             }
 
             item {
-                EnumListPreference(
-                    title = { Text(stringResource(R.string.update_channel)) },
-                    icon = { Icon(painterResource(R.drawable.tune), null) },
-                    selectedValue = updateChannel,
-                    valueText = { ch ->
-                        when (ch) {
-                            UpdateChannel.STABLE  -> stringResource(R.string.channel_stable)
-                            UpdateChannel.NIGHTLY -> stringResource(R.string.channel_nightly)
-                        }
-                    },
-                    onValueSelected = { ch ->
-                        if (ch == UpdateChannel.NIGHTLY && updateChannel != UpdateChannel.NIGHTLY)
-                            showNightlyConfirmDialog = true
-                        else
-                            onUpdateChannelChange(ch)
-                    }
-                )
-            }
-
-            item {
                 Spacer(Modifier.height(8.dp))
                 Button(
                     onClick = { navController.navigate("settings/changelog") },
@@ -409,45 +357,6 @@ fun UpdateScreen(
                     Icon(painterResource(R.drawable.update), null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.view_changelog))
-                }
-            }
-
-            item {
-                AnimatedVisibility(visible = updateChannel == UpdateChannel.NIGHTLY) {
-                    val latestHash = commits.firstOrNull()?.sha ?: "—"
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                        )
-                    ) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text("Nightly Builds", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Spacer(Modifier.height(6.dp))
-                            Text(
-                                "Latest features and fixes from the development branch. May contain experimental features and occasional bugs",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(Modifier.height(10.dp))
-                            Text(latestHash, style = MaterialTheme.typography.labelMedium, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.height(14.dp))
-                            Button(onClick = {
-                                pendingUpdateInfo = UpdateInfo(
-                                    tagName = "nightly",
-                                    versionName = latestHash,
-                                    downloadUrl = nightlyInstallUrl,
-                                    releasePageUrl = nightlyInstallUrl,
-                                    releaseNotes = "Nightly Build: $latestHash",
-                                    publishedAt = ""
-                                )
-                                showUpdateBottomSheet = true
-                             }, modifier = Modifier.fillMaxWidth()) {
-                                Text("Install")
-                            }
-                        }
-                    }
                 }
             }
 

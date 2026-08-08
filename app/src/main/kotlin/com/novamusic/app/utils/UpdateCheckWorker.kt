@@ -15,8 +15,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import com.novamusic.app.BuildConfig
 import com.novamusic.app.constants.EnableUpdateNotificationKey
-import com.novamusic.app.constants.UpdateChannel
-import com.novamusic.app.constants.UpdateChannelKey
 
 class UpdateCheckWorker(
     context: Context,
@@ -29,14 +27,6 @@ class UpdateCheckWorker(
 
             val isEnabled = dataStore.data.map { it[EnableUpdateNotificationKey] ?: false }.first()
             if (!isEnabled) return Result.success()
-
-            val updateChannel = dataStore.data.map {
-                it[UpdateChannelKey]?.let { value ->
-                    try { UpdateChannel.valueOf(value) } catch (e: Exception) { UpdateChannel.STABLE }
-                } ?: UpdateChannel.STABLE
-            }.first()
-
-            if (updateChannel == UpdateChannel.NIGHTLY) return Result.success()
 
             Updater.getLatestVersionName().onSuccess { latestVersion ->
                 if (!Updater.isSameVersion(latestVersion, BuildConfig.VERSION_NAME)) {

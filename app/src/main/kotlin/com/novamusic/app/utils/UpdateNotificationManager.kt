@@ -35,8 +35,6 @@ import com.novamusic.app.R
 import com.novamusic.app.constants.EnableUpdateNotificationKey
 import com.novamusic.app.constants.LastNotifiedVersionKey
 import com.novamusic.app.constants.LastUpdateCheckKey
-import com.novamusic.app.constants.UpdateChannel
-import com.novamusic.app.constants.UpdateChannelKey
 import java.util.concurrent.TimeUnit
 
 object UpdateNotificationManager {
@@ -96,14 +94,6 @@ object UpdateNotificationManager {
                 }
 
                 schedulePeriodicUpdateCheck(context)
-
-                val updateChannel = dataStore.data.map { 
-                    it[UpdateChannelKey]?.let { value -> 
-                        try { UpdateChannel.valueOf(value) } catch (e: Exception) { UpdateChannel.STABLE }
-                    } ?: UpdateChannel.STABLE
-                }.first()
-
-                if (updateChannel == UpdateChannel.NIGHTLY) return@launch
 
                 val lastCheck = dataStore.data.map { it[LastUpdateCheckKey] ?: 0L }.first()
                 val now = System.currentTimeMillis()
