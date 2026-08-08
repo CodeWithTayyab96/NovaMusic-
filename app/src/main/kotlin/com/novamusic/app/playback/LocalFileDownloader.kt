@@ -157,10 +157,27 @@ constructor(
                     throw IOException("Empty download response for $songId: $detail")
                 }
 
-                val mimeType = contentMime.ifEmpty { expectedMime ?: "audio/mpeg" }
+                // The resolved format's mimeType (e.g. "audio/webm", "audio/mp4") is the
+                // authoritative container for the stream we selected; the CDN's Content-Type
+                // header can be missing or mislabeled (video/webm, application/octet-stream)
+                // for audio-only streams, so prefer it when deciding the container/extension.
+                val containerMime = expectedMime
+                    ?.substringBefore(';')
+                    ?.trim()
+                    ?.lowercase()
+                    ?.takeIf { it.isNotBlank() }
+                    ?: contentMime
+                val extension = extensionForMime(containerMime)
+                // MediaStore MIME_TYPE: keep a real audio/* value even when the CDN labels an
+                // audio-only stream as video/* or octet-stream.
+                val storeMime = when {
+                    containerMime.startsWith("audio/") -> containerMime
+                    expectedMime?.startsWith("audio/") == true -> expectedMime
+                    else -> mimeForExtension(extension)
+                }
 
                 val displayName =
-                    "${sanitizeFileName(safeTitle)} - ${sanitizeFileName(artist)}.${extensionForMime(mimeType)}"
+                    "${sanitizeFileName(safeTitle)} - ${sanitizeFileName(artist)}.$extension"
                 val collection =
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
@@ -169,7 +186,7 @@ constructor(
                     }
                 val values = ContentValues().apply {
                     put(MediaStore.Audio.Media.DISPLAY_NAME, displayName)
-                    put(MediaStore.Audio.Media.MIME_TYPE, mimeType)
+                    put(MediaStore.Audio.Media.MIME_TYPE, storeMime)
                     put(MediaStore.Audio.Media.TITLE, safeTitle)
                     put(MediaStore.Audio.Media.ARTIST, artist)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -181,10 +198,10 @@ constructor(
                     ?: throw IOException("Failed to create MediaStore entry for $songId")
 
                 try {
+                    var bytesDownloaded = 0L
                     context.contentResolver.openOutputStream(uri)?.use { output ->
                         body.source().use { input ->
                             val buffer = Buffer()
-                            var bytesDownloaded = 0L
                             // Progress throttling: updating _progress copies the whole map and
                             // triggers recomposition across every screen observing it. Firing on
                             // every 64KB buffer read (dozens of times per second) was the cause of
@@ -224,6 +241,23 @@ constructor(
                             }
                         }
                     } ?: throw IOException("Failed to open output stream for $songId")
+
+                    // 1) Completeness check: a stream that ends early (or is cut off mid-transfer
+                    // by the CDN/proxy) yields a truncated file that plays inside ExoPlayer (which
+                    // sniffs and tolerates partial containers) but fails in strict external players
+                    // like VLC. Compare what we wrote against the promised Content-Length and fail
+                    // loudly instead of keeping a broken file. Unknown lengths (-1) can't be checked.
+                    if (contentLength > 0 && bytesDownloaded != contentLength) {
+                        throw IOException(
+                            "Download incomplete: got $bytesDownloaded of $contentLength bytes for $songId",
+                        )
+                    }
+
+                    // 2) Container sanity check: confirm the bytes we saved actually start with a
+                    // known audio container magic and log the detected container so extension/container
+                    // mismatches (e.g. a WebM file saved as .m4a) are visible in logcat before
+                    // testing in an external player. Throws (and rolls back) on garbage payloads.
+                    verifySavedContainer(uri, songId, extension)
 
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         values.clear()
@@ -426,26 +460,74 @@ constructor(
     }
 
     /**
-     * Cheap magic-byte check: true when the stream looks like a known audio container
-     * (mp3/ID3, flac, ogg/opus, wav, aiff, m4a/ftyp, webm/EBML, MPEG/ADTS frame sync).
+     * Identifies the audio container from the stream's leading magic bytes. Returns a
+     * human-readable container name, or null when the payload isn't a known audio
+     * container (error page, garbage, empty file).
      */
-    private fun sniffAudioHeader(input: InputStream): Boolean {
+    private fun detectContainer(input: InputStream): String? {
         val header = ByteArray(16)
         val n = input.read(header)
-        if (n < 4) return false
+        if (n < 4) return null
         fun ascii(offset: Int, text: String): Boolean {
             val signature = text.toByteArray(Charsets.US_ASCII)
             if (offset + signature.size > n) return false
             return signature.indices.all { i -> header[offset + i] == signature[i] }
         }
-        return ascii(0, "ID3") ||
-            ascii(0, "fLaC") ||
-            ascii(0, "OggS") ||
-            ascii(0, "RIFF") ||
-            ascii(0, "FORM") ||
-            ascii(4, "ftyp") ||
-            (header[0] == 0x1A.toByte() && header[1] == 0x45.toByte() && header[2] == 0xDF.toByte() && header[3] == 0xA3.toByte()) ||
-            (header[0] == 0xFF.toByte() && (header[1].toInt() and 0xE0) == 0xE0)
+        return when {
+            ascii(0, "ID3") -> "MP3 (ID3)"
+            ascii(0, "fLaC") -> "FLAC"
+            ascii(0, "OggS") -> "Ogg (Opus/Vorbis)"
+            ascii(0, "RIFF") -> "WAV"
+            ascii(0, "FORM") -> "AIFF"
+            ascii(4, "ftyp") -> "MP4/M4A"
+            header[0] == 0x1A.toByte() && header[1] == 0x45.toByte() &&
+                header[2] == 0xDF.toByte() && header[3] == 0xA3.toByte() -> "WebM/EBML"
+            header[0] == 0xFF.toByte() && (header[1].toInt() and 0xE0) == 0xE0 -> "MP3 (MPEG sync)"
+            else -> null
+        }
+    }
+
+    /** Cheap magic-byte check: true when the stream looks like a known audio container. */
+    private fun sniffAudioHeader(input: InputStream): Boolean = detectContainer(input) != null
+
+    /**
+     * Re-opens the just-written file, confirms it starts with a known audio container
+     * magic, and logs the detected container + expected extension so mismatches are
+     * visible in logcat. Throws (rolling back the download) when the payload has no
+     * recognizable audio container at all.
+     */
+    private fun verifySavedContainer(uri: Uri, songId: String, extension: String) {
+        val stream = runCatching { context.contentResolver.openInputStream(uri) }.getOrNull()
+            ?: throw IOException("Cannot re-open downloaded file for $songId to verify it")
+        val container = stream.use { detectContainer(it) }
+            ?: throw IOException(
+                "Downloaded file for $songId has no recognizable audio container — refusing to keep it",
+            )
+        val expected = when (extension) {
+            "webm" -> "WebM/EBML"
+            "m4a" -> "MP4/M4A"
+            else -> null
+        }
+        val mismatch = expected != null && container != expected
+        Log.i(
+            TAG,
+            "Downloaded $songId: container=$container extension=.$extension" +
+                if (mismatch) " — WARNING: container does not match extension (expected $expected)" else "",
+        )
+        if (mismatch) {
+            Log.w(TAG, "Container/extension mismatch for $songId — external players may refuse this file")
+        }
+    }
+
+    /** Maps a file extension back to a sensible audio/* MIME type for MediaStore. */
+    private fun mimeForExtension(extension: String): String = when (extension) {
+        "webm" -> "audio/webm"
+        "ogg" -> "audio/ogg"
+        "flac" -> "audio/flac"
+        "wav" -> "audio/wav"
+        "aac" -> "audio/aac"
+        "mp3" -> "audio/mpeg"
+        else -> "audio/mp4"
     }
 
     companion object {
@@ -491,12 +573,25 @@ constructor(
 private fun sanitizeFileName(name: String): String =
     name.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifBlank { "Unknown" }
 
-private fun extensionForMime(mime: String): String = when {
-    mime.contains("opus") || mime.contains("webm") -> "opus"
-    mime.contains("ogg") -> "ogg"
-    mime.contains("flac") -> "flac"
-    mime.contains("wav") -> "wav"
-    mime.contains("aac") -> "aac"
-    mime.contains("mp4") || mime.contains("mpeg") || mime.contains("mp3") -> "m4a"
-    else -> "m4a"
+/**
+ * Maps a container mime (e.g. "audio/webm", "audio/mp4") to the file extension that
+ * matches the actual container bytes. YouTube's audio-only webm streams (itag
+ * 249/250/251 — opus or vorbis codec inside) are served in a WebM (EBML) container,
+ * NOT as a bare Ogg-Opus stream, so they must be saved as ".webm": a ".opus"
+ * extension implies a raw Ogg-Opus file, which is a different container and confuses
+ * strict external players like VLC. Only mp4/m4a-family streams (itag 139/140 — AAC
+ * inside) get ".m4a". The codec inside never changes the container extension.
+ */
+internal fun extensionForMime(mime: String): String {
+    val container = mime.substringBefore(';').trim().lowercase()
+    return when {
+        container.contains("webm") -> "webm"
+        container.contains("ogg") -> "ogg"
+        container.contains("flac") -> "flac"
+        container.contains("wav") -> "wav"
+        container.contains("aac") -> "aac"
+        container.contains("mp4") || container.contains("m4a") -> "m4a"
+        container.contains("mp3") || container.contains("mpeg") -> "mp3"
+        else -> "m4a"
+    }
 }
