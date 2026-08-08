@@ -75,9 +75,16 @@ object DownloadNotificationManager {
     ): Notification {
         val indeterminate = state.totalBytes <= 0
         val progress = (state.progress * 100).toInt().coerceIn(0, 100)
+        val title =
+            if (indeterminate) {
+                // bytesTotal unknown — keep the title plain and let the spinner show
+                state.title
+            } else {
+                context.getString(R.string.download_progress_percent, state.title, progress)
+            }
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.downloading)
-            .setContentTitle(state.title)
+            .setContentTitle(title)
             .setContentText(state.artist.ifBlank { context.getString(R.string.downloading) })
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOnlyAlertOnce(true)
