@@ -37,12 +37,12 @@ class LocalFileDownloadWorker(
 
         DownloadNotificationManager.ensureChannel(applicationContext)
 
-        return try {
-            val downloader =
-                EntryPointAccessors
-                    .fromApplication(applicationContext, LocalFileDownloaderEntryPoint::class.java)
-                    .localFileDownloader()
+        val downloader =
+            EntryPointAccessors
+                .fromApplication(applicationContext, LocalFileDownloaderEntryPoint::class.java)
+                .localFileDownloader()
 
+        return try {
             // Start in QUEUED state so a foreground notification exists immediately.
             val queued =
                 LocalDownloadState(songId, title, artist, LocalDownloadState.State.QUEUED)
