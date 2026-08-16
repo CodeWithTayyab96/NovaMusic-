@@ -67,5 +67,12 @@ jobs:
 
       # Runs assemble + unit tests (+ lint, which has abortOnError=false here)
       # for every ABI flavor / build type. Slow but comprehensive.
+      #
+      # --no-parallel --max-workers=2 is REQUIRED: building all 10 variant
+      # combos (5 flavors x debug/release) in parallel spawns multiple Kotlin
+      # daemons (each up to -Xmx4096M from gradle.properties), which exhausts
+      # the runner's memory and dies with OutOfMemoryError: GC overhead limit
+      # exceeded during release-variant codegen. Serializing the compile keeps
+      # it well within the 16GB runner.
       - name: Build all variants + run unit tests
-        run: ./gradlew build --no-daemon --stacktrace
+        run: ./gradlew build --no-daemon --stacktrace --no-parallel --max-workers=2
