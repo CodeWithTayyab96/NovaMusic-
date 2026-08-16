@@ -34,7 +34,7 @@ fun fetchGitCommitHash(): String {
     // Fallback: Obtener del repositorio remoto de GitHub sin dependencias externas
     return try {
         println("Fetching latest commit from GitHub API...")
-        val url = URL("https://api.github.com/repos/Arturo254/OpenTune/commits/master")
+        val url = URL("https://api.github.com/repos/CodeWithTayyab96/NovaMusic/commits/master")
         val connection = url.openConnection() as HttpURLConnection
         connection.requestMethod = "GET"
         connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
