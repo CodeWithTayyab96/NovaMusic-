@@ -108,7 +108,7 @@ constructor(
                     SongFilter.LIKED -> database.likedSongs(sortType, descending, hideVideo).map { it.filterExplicit(hideExplicit) }
                     SongFilter.DOWNLOADED ->
                         database.allSongs().flowOn(Dispatchers.IO).map { songs ->
-                            songs.filter { it.song.isLocal }.let { filteredSongs ->
+                            songs.filter { it.song.isDownloadedByApp() }.let { filteredSongs ->
                                 when (sortType) {
                                     SongSortType.CREATE_DATE -> filteredSongs.sortedBy {
                                         it.song.dateDownload
@@ -255,7 +255,7 @@ constructor(
                     AlbumFilter.DOWNLOADED ->
                         database.allSongs().flowOn(Dispatchers.IO)
                             .map { songs ->
-                                songs.filter { it.song.isLocal }
+                                songs.filter { it.song.isDownloadedByApp() }
                                     .mapNotNull { it.song.albumId }.toSet()
                             }
                             .flatMapLatest { downloadedAlbumIds ->
@@ -266,7 +266,7 @@ constructor(
                     AlbumFilter.DOWNLOADED_FULL ->
                         database.allSongs().flowOn(Dispatchers.IO)
                             .map { songs ->
-                                songs.filter { it.song.isLocal }
+                                songs.filter { it.song.isDownloadedByApp() }
                                     .mapNotNull { song -> song.song.albumId?.let { it to song } }
                                     .groupBy({ it.first }, { it.second })
                                     .mapValues { it.value.size }

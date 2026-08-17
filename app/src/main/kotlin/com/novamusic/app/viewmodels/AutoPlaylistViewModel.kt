@@ -86,7 +86,7 @@ constructor(
                 when (playlist) {
                     "liked" -> database.likedSongs(songSortType, descending, hideVideo).map { it.filterExplicit(hideExplicit) }
                     "downloaded" -> database.allSongs().flowOn(Dispatchers.IO).map { songs ->
-                        songs.filter { it.song.isLocal }.let { filteredSongs ->
+                        songs.filter { it.song.isDownloadedByApp() }.let { filteredSongs ->
                             when (songSortType) {
                                 SongSortType.CREATE_DATE -> filteredSongs.sortedBy {
                                     it.song.dateDownload

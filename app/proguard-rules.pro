@@ -133,3 +133,17 @@
 -keep class * extends androidx.room.RoomDatabase
 -keep @androidx.room.Entity class *
 -keep class * extends androidx.room.AutoMigrationSpec
+
+## WorkManager
+# WorkManager's default WorkerFactory instantiates worker classes reflectively
+# (Class.forName on the stored class name + the (Context, WorkerParameters)
+# constructor). R8 can strip that reflective-only constructor or rename the
+# class, which surfaces as downloads enqueuing fine but failing at execution
+# time on minified/release builds. Keep worker subclasses, their constructors,
+# and every Hilt @EntryPoint interface resolved via EntryPointAccessors.
+-keep class * extends androidx.work.ListenableWorker {
+    public <init>(android.content.Context, androidx.work.WorkerParameters);
+}
+-keep class com.novamusic.app.playback.LocalFileDownloadWorker { *; }
+-keep interface com.novamusic.app.di.LocalFileDownloaderEntryPoint { *; }
+-keep @dagger.hilt.android.EntryPoint interface * { *; }
