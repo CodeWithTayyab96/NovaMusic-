@@ -1,15 +1,24 @@
-name: Release build (signed APK)
+name: Release build (signed APK + GitHub Release)
 
 # Manual only — never runs on push/PR. Trigger from the Actions tab:
-# Actions > "Release build (signed APK)" > Run workflow.
+# Actions > "Release build (signed APK + GitHub Release)" > Run workflow,
+# then fill in the version input (e.g. v1.0.1).
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version — used as the git tag and release title (e.g. v1.0.1). Must not already exist."
+        required: true
+        type: string
 
 jobs:
   release-build:
-    name: Build signed release APK
+    name: Build signed release APK and publish release
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # Needed to create the git tag + GitHub Release with the built-in GITHUB_TOKEN.
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
@@ -47,13 +56,43 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew assembleUniversalRelease --no-daemon --stacktrace
 
+      # The in-app updater (Updater.kt) reads GitHub Releases directly, so the APK
+      # must be a release ASSET named exactly "app-universal-release.apk"
+      # (APK_ASSET_NAME in Updater.kt), not just a temporary workflow artifact.
+      # Fail clearly instead of overwriting if the tag already exists.
+      - name: Check release tag does not already exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ inputs.version }}")
+          if [ "$code" = "200" ]; then
+            echo "::error::Release tag '${{ inputs.version }}' already exists. Pick a new version (e.g. v1.0.1)."
+            exit 1
+          fi
+          if [ "$code" != "404" ]; then
+            echo "::error::Unexpected GitHub API response ($code) while checking tag '${{ inputs.version }}'."
+            exit 1
+          fi
+          echo "Tag '${{ inputs.version }}' is free."
+
+      - name: Publish GitHub Release with APK asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.version }}
+          name: ${{ inputs.version }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: app/build/outputs/apk/universal/release/app-universal-release.apk
+
       # Always delete the decoded keystore from the runner workspace, even if the
       # build above failed, so it never lingers or gets cached/uploaded.
       - name: Clean up keystore (always)
         if: always()
         run: rm -f app/keystore/release.keystore
 
-      - name: Upload release APK
+      - name: Upload release APK artifact (backup copy)
         uses: actions/upload-artifact@v7
         with:
           name: NovaMusic-release-apk
