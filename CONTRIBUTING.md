@@ -1,31 +1,29 @@
-
-
 # Contribution Guide
 
-Thank you for your interest in contributing to **OpenTune**! This document outlines the guidelines and best practices for contributing to the project. By following these recommendations, you help us maintain high-quality code and a collaborative, inclusive community.
+Thank you for your interest in contributing to **NovaMusic**! This document
+outlines the guidelines and best practices for contributing to the project.
+By following these recommendations, you help us maintain high-quality code
+and a collaborative, inclusive community.
 
-> \[!NOTE]
-> Before you begin, make sure to read and understand our [Code of Conduct](CODE_OF_CONDUCT.md).
+> [!NOTE]
+> Before you begin, make sure to read and understand our
+> [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Table of Contents
 
 * [How to Contribute](#how-to-contribute)
-
   * [Reporting Bugs](#reporting-bugs)
   * [Suggesting Features](#suggesting-features)
   * [Submitting Pull Requests](#submitting-pull-requests)
 * [Style Guide](#style-guide)
-
   * [Code Style](#code-style)
   * [Commit Messages](#commit-messages)
   * [Documentation](#documentation)
 * [Development Process](#development-process)
-
   * [Git Workflow](#git-workflow)
   * [Pull Request Lifecycle](#pull-request-lifecycle)
 * [Development Environment Setup](#development-environment-setup)
 * [Translation Contributions](#translation-contributions)
-* [Design Contributions](#design-contributions)
 
 ---
 
@@ -33,7 +31,10 @@ Thank you for your interest in contributing to **OpenTune**! This document outli
 
 ### Reporting Bugs
 
-We track bugs using [GitHub Issues](https://github.com/Arturo254/OpenTune/issues). Before creating a new issue, please search existing issues to see if the problem has already been reported. If you find a similar issue, feel free to add relevant information or insights as a comment.
+We track bugs using [GitHub Issues](https://github.com/CodeWithTayyab96/NovaMusic-/issues).
+Before creating a new issue, please search existing issues to see if the
+problem has already been reported. If you find a similar issue, feel free to
+add relevant information or insights as a comment.
 
 When creating a new issue, include:
 
@@ -44,42 +45,53 @@ When creating a new issue, include:
 * **Screenshots** if applicable
 * **Relevant logs** if available
 
-> \[!TIP]
+> [!TIP]
 > Use the provided templates to ensure you include all the necessary details.
 
 ---
 
 ### Suggesting Features
 
-We also handle feature suggestions through [GitHub Issues](https://github.com/Arturo254/OpenTune/issues). When suggesting a new feature:
+We also handle feature suggestions through [GitHub Issues](https://github.com/CodeWithTayyab96/NovaMusic-/issues).
+When suggesting a new feature:
 
 * **Describe the problem** the feature is intended to solve
 * **Explain the solution** and how it would work
 * **Provide examples** or use cases if possible
-* **Assess the scope** of the feature: is it minor, moderate, or large in terms of implementation effort?
+* **Assess the scope** of the feature: is it minor, moderate, or large in
+  terms of implementation effort?
 
-> \[!IMPORTANT]
-> Please discuss the feature in an issue and obtain approval from the maintainers before starting development.
+> [!IMPORTANT]
+> Please discuss the feature in an issue and obtain approval from the
+> maintainers before starting development.
 
 ---
 
 ### Submitting Pull Requests
 
-Pull Requests (PRs) are the primary way to contribute code to OpenTune. To ensure your PR is effective and easy to review, follow these steps:
+Pull Requests (PRs) are the primary way to contribute code to NovaMusic. To
+ensure your PR is effective and easy to review, follow these steps:
 
-1. **Fork the repository** and create a feature branch from the default branch (`master`; the CI workflows also listen to `main`).
+1. **Fork the repository** and create a feature branch from the default
+   branch (`main`).
 2. **Implement your changes** while following the [style guide](#style-guide).
 3. **Write or update tests** as needed to cover your changes.
 4. **Ensure all tests pass** before submitting your PR.
-5. **Update the documentation** if your changes affect the public API or usage instructions.
-6. **Submit your pull request** with a **clear, concise, and informative description**.
+5. **Update the documentation** if your changes affect the public API or
+   usage instructions.
+6. **Submit your pull request** with a **clear, concise, and informative
+   description**.
 
 Your PR description should include:
 
-* **Purpose**: What problem does this PR solve? What feature or fix does it introduce?
-* **Motivation**: Why is this change necessary or useful? How does it improve the project?
-* **Implementation details**: Briefly explain how the changes were implemented.
-* **Related issues**: Link to any related issues using `Closes #123`, `Fixes #456`, etc.
+* **Purpose**: What problem does this PR solve? What feature or fix does it
+  introduce?
+* **Motivation**: Why is this change necessary or useful? How does it improve
+  the project?
+* **Implementation details**: Briefly explain how the changes were
+  implemented.
+* **Related issues**: Link to any related issues using `Closes #123`,
+  `Fixes #456`, etc.
 
 Example:
 
@@ -88,7 +100,8 @@ Example:
 This PR adds offline playback support for downloaded audio files.
 
 ### Motivation
-This feature improves the user experience for those who want to listen to music without an internet connection.
+This feature improves the user experience for those who want to listen to
+music without an internet connection.
 
 ### Changes
 - Added local media cache management
@@ -99,8 +112,9 @@ This feature improves the user experience for those who want to listen to music 
 Closes #45
 ```
 
-> \[!TIP]
-> Well-written PRs that clearly explain their purpose and impact are more likely to be reviewed and merged quickly.
+> [!TIP]
+> Well-written PRs that clearly explain their purpose and impact are more
+> likely to be reviewed and merged quickly.
 
 ---
 
@@ -118,7 +132,8 @@ Closes #45
 
 ### Commit Messages
 
-We use [Conventional Commits](https://www.conventionalcommits.org/) to keep commit history clean and meaningful:
+We use [Conventional Commits](https://www.conventionalcommits.org/) to keep
+commit history clean and meaningful:
 
 ```
 <type>(<optional scope>): <short description>
@@ -164,13 +179,10 @@ docs(readme): update installation instructions
 
 We use a structured branching model:
 
-* `master`: The default and production-ready branch (the CI workflows also listen to `main`)
-* `develop`: The active development branch
+* `main`: The default and production-ready branch (CI workflows listen to it)
 * `feature/xyz`: New feature branches
 * `fix/xyz`: Bug fix branches
 * `release/xyz`: Release preparation branches
-
----
 
 ### Pull Request Lifecycle
 
@@ -179,7 +191,7 @@ We use a structured branching model:
 3. **CI Validation**: Automated tests are run
 4. **Discussion**: Issues are resolved and necessary changes are made
 5. **Approval**: Once approved, the PR is ready for merging
-6. **Merge**: The PR is merged into the target branch
+6. **Merge**: The PR is merged into `main`
 
 ---
 
@@ -187,24 +199,56 @@ We use a structured branching model:
 
 To set up your local environment for contributing:
 
-1. **Install JDK 21** — the project requires it (`kotlin.jvmToolchain(21)` + `compileOptions` `JavaVersion.VERSION_21`). The foojay toolchain auto-provisioning plugin is disabled in `settings.gradle.kts`, so your installed JDK must be 21.
+1. **Install JDK 21** — the project requires it (`kotlin.jvmToolchain(21)` +
+   `compileOptions` `JavaVersion.VERSION_21`). The foojay toolchain
+   auto-provisioning plugin is disabled in `settings.gradle.kts`, so your
+   installed JDK must be 21.
 2. **Install Android Studio** (current stable release, 2024.2+ recommended)
-3. **Configure Android SDK** (platform **API 36**: compileSdk 36, targetSdk 36, minSdk 26)
+3. **Configure Android SDK** (platform **API 36**: compileSdk 36, targetSdk
+   36, minSdk 26)
 4. **Clone the repository**:
 
    ```bash
-   git clone https://github.com/Arturo254/OpenTune.git
-   cd OpenTune
+   git clone https://github.com/CodeWithTayyab96/NovaMusic-.git
+   cd NovaMusic-
    ```
-5. **Build the project using the Gradle wrapper** (no Gradle installation needed — the wrapper pins Gradle 9.4.1):
+5. **Build the project using the Gradle wrapper** (no Gradle installation
+   needed — the wrapper pins Gradle 9.4.1):
 
    ```bash
    ./gradlew build
    ```
 
-   The app defines ABI product flavors (`universal`, `arm64`, `armeabi`, `x86`, `x86_64`), so a plain `assembleDebug` task does not exist. For a quick debug APK use `./gradlew assembleUniversalDebug` — the APK lands in `app/build/outputs/apk/universal/debug/`.
+   The app defines ABI product flavors (`universal`, `arm64`, `armeabi`,
+   `x86`, `x86_64`), so a plain `assembleDebug` task does not exist. For a
+   quick debug APK use `./gradlew assembleUniversalDebug` — the APK lands in
+   `app/build/outputs/apk/universal/debug/`.
 
-> CI is provided via GitHub Actions (`.github/workflows/build.yml`), which runs on JDK 21 and builds the universal debug APK plus the full `build` with unit tests on every push to `main`/`master`.
+> **Note for low-memory machines**: a full `./gradlew build` compiles all ten
+> variant combos and can exhaust the heap — use
+> `./gradlew build --no-parallel --max-workers=2` (this is what CI does).
+
+### Continuous Integration
+
+CI runs on GitHub Actions (`.github/workflows/`):
+
+- **`build.yml`** — on push to `main` and manual dispatch: builds the
+  universal debug APK, then runs the full `build` with unit tests. The
+  signing keystore is decoded from repository secrets for the full-build job.
+- **`release-build.yml`** — manual release pipeline: builds a signed release
+  APK and publishes it as a GitHub Release asset. Requires the
+  `KEYSTORE_BASE64`, `STORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD`
+  repository secrets.
+
+### Releasing
+
+Releases are cut from the **Actions** tab using `release-build.yml`. The
+`version` input becomes both the git tag and release title. Before releasing:
+
+1. Bump `versionCode` and `versionName` in `app/build.gradle.kts` so they
+   match the tag you're about to create (the in-app updater compares the
+   release tag against the app's `versionName`).
+2. Dispatch `release-build.yml` with the matching tag (e.g. `v1.0.1`).
 
 ---
 
@@ -212,27 +256,16 @@ To set up your local environment for contributing:
 
 To help with translations:
 
-1. Sign up on [Crowdin](https://crowdin.com/project/opentune)
-2. Choose the language you want to contribute to
-3. Translate missing strings or improve existing translations
-4. The maintainer team will review and approve submissions
+1. Edit or add strings in `app/src/main/res/values-*` (or submit new locale
+   directories)
+2. Submit a pull request with your translations
 
-If your language is not listed, contact us at [cervantesarturo254@gmail.com](mailto:cervantesarturo254@gmail.com).
-
----
-
-## Design Contributions
-
-To contribute design ideas:
-
-1. Review the [Material Design 3 Guidelines](https://m3.material.io/)
-2. Create mockups or interactive prototypes
-3. Submit your designs in a GitHub issue labeled `design`
-4. Include reasoning for how your designs improve the user experience
+Translations are reviewed by the maintainers before merging.
 
 ---
 
-Thank you for contributing to **OpenTune**! Your efforts help us build a better experience for all users.
-If you have any questions, feel free to open an issue labeled `question` or reach out directly to the development team.
+Thank you for contributing to **NovaMusic**! Your efforts help us build a
+better experience for all users.
 
-
+If you have any questions, feel free to open an issue labeled `question` on
+the [issue tracker](https://github.com/CodeWithTayyab96/NovaMusic-/issues).

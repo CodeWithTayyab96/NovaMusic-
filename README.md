@@ -1,15 +1,14 @@
-# OpenTune
+# NovaMusic
 
 <div align="center">
-  <img src="https://github.com/Arturo254/OpenTune/blob/master/fastlane/metadata/android/en-US/images/featureGraphic.png" alt="OpenTune Banner" width="100%"/>
 
   ### Advanced YouTube Music client with Material Design 3 for Android
 
-  [![Latest Release](https://img.shields.io/github/v/release/Arturo254/OpenTune?style=flat-square&logo=github&color=0D1117&labelColor=161B22)](https://github.com/Arturo254/OpenTune/releases)
-  [![License](https://img.shields.io/github/license/Arturo254/OpenTune?style=flat-square&logo=gnu&color=2B3137&labelColor=161B22)](https://github.com/Arturo254/OpenTune/blob/main/LICENSE)
-  [![Translation Status](https://badges.crowdin.net/opentune/localized.svg)](https://crowdin.com/project/opentune)
+  [![Latest Release](https://img.shields.io/github/v/release/CodeWithTayyab96/NovaMusic-?style=flat-square&logo=github&color=0D1117&labelColor=161B22)](https://github.com/CodeWithTayyab96/NovaMusic-/releases)
+  [![License](https://img.shields.io/github/license/CodeWithTayyab96/NovaMusic-?style=flat-square&logo=gnu&color=2B3137&labelColor=161B22)](https://github.com/CodeWithTayyab96/NovaMusic-/blob/main/LICENSE)
   [![Android](https://img.shields.io/badge/Platform-Android%208.0+-3DDC84.svg?style=flat-square&logo=android&logoColor=white&labelColor=161B22)](https://www.android.com)
   [![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white&labelColor=161B22)](.github/workflows/build.yml)
+
 </div>
 
 ---
@@ -20,31 +19,50 @@
 - [Key Features](#key-features)
 - [Technology Stack](#technology-stack)
 - [Project Structure](#project-structure)
+- [Downloads Architecture](#downloads-architecture)
 - [Installation](#installation)
 - [Building from Source](#building-from-source)
+- [Releases & the In-App Updater](#releases--the-in-app-updater)
 - [Continuous Integration](#continuous-integration)
+- [Support](#support)
 - [Contributing](#contributing)
-- [Support the Project](#support-the-project)
-- [Acknowledgments](#acknowledgments)
+- [Upstream Attribution](#upstream-attribution)
 - [License](#license)
 
 ---
 
 ## Overview
 
-**OpenTune** is an open-source YouTube Music client designed for Android devices. It delivers a superior user experience with a modern interface built on **Jetpack Compose** and **Material Design 3**, offering advanced features to explore, play, and manage music without the limitations of the official application.
+**NovaMusic** is an open-source YouTube Music client for Android, forked from
+[OpenTune](https://github.com/Arturo254/OpenTune) (itself part of the
+InnerTune / ArchiveTune lineage). It delivers a modern interface built on
+**Jetpack Compose** and **Material Design 3**, with advanced features to
+explore, play, and manage music without the limitations of the official
+application.
 
-The app is developed as a multi-module Kotlin project using **Media3 / ExoPlayer** for playback, **Hilt** for dependency injection, **Room** for local storage, and **Jetpack Compose** for the UI.
+The app is a multi-module Kotlin project using **Media3 / ExoPlayer** for
+playback, **Hilt** for dependency injection, **Room** for local storage, and
+**Jetpack Compose** for the UI.
 
-### Key Benefits
+### What makes NovaMusic different from stock OpenTune
 
-- **Ad-free experience** — no advertising interruptions
-- **Background playback** — keep listening while using other apps
-- **Privacy-focused** — no data collection or tracking
-- **Customizable interface** — dynamic themes and many options
-- **Real offline downloads** — songs are saved as actual audio files on your device (in `Music/NovaMusic/`) and survive app restarts
+- **Real offline downloads (the headline feature).** Songs are saved as
+  *actual playable audio files* in `Music/NovaMusic/` via MediaStore — not an
+  opaque app cache. Downloads run through WorkManager so they survive closing
+  or killing the app, show live per-song progress (including in the
+  notification shade), and produce files that any music player can open.
+  See [Downloads Architecture](#downloads-architecture).
+- **Independent branding and identity.** New name, package
+  (`com.novamusic.app`), logo, launcher icons, and a fresh version history
+  starting at 1.0.0.
+- **Self-hosted update channel.** The in-app updater checks **this**
+  repository's GitHub Releases (not upstream's), so updates always come from
+  NovaMusic itself.
+- **Release signing & CI/CD.** A signed release pipeline publishes APKs as
+  GitHub Release assets, ready for sideloading or a future store.
 
-> **Note**: OpenTune is an independent project and is not affiliated with, sponsored by, or endorsed by YouTube or Google.
+> **Note**: NovaMusic is an independent project and is not affiliated with,
+> sponsored by, or endorsed by YouTube or Google.
 
 ---
 
@@ -57,8 +75,8 @@ The app is developed as a multi-module Kotlin project using **Media3 / ExoPlayer
 | 🎵 **Ad-free playback** | Enjoy music without advertising interruptions |
 | 🔄 **Background playback** | Continue listening while using other applications |
 | 🔍 **Advanced search** | Quickly find songs, videos, albums, playlists, and artists |
-| 📥 **Real file downloads** | Downloads are written to disk via MediaStore (Music/NovaMusic/) as playable audio files, driven by WorkManager so they survive app close/kill |
-| 📥 **Download queue** | Live per-song progress (queued / downloading / completed / failed) with cancel and remove actions — downloads run in the background and survive app restarts |
+| 📥 **Real file downloads** | Downloads are written to disk via MediaStore (`Music/NovaMusic/`) as playable audio files, driven by WorkManager so they survive app close/kill |
+| 📥 **Download queue** | Live per-song progress (queued / downloading / completed / failed) with cancel and remove actions |
 | 📚 **Library management** | Albums, artists, playlists, history, favorites, and statistics — all stored locally in Room |
 | 📱 **Offline mode** | Downloaded songs are flagged `isLocal` and the player prefers the local file automatically |
 | 💾 **Backup & restore** | Export and import your library and settings |
@@ -69,7 +87,7 @@ The app is developed as a multi-module Kotlin project using **Media3 / ExoPlayer
 
 | Feature | Description |
 |---|---|
-| 🎤 **Synchronized lyrics** | Synced lyrics from multiple providers (LRC Lib, Kugou, SimpMusic, BetterLyrics, YouTube subtitles, and more) |
+| 🎤 **Synchronized lyrics** | Synced lyrics from multiple providers (LRC Lib, Kugou, SimpMusic, BetterLyrics, Kizzy, YouTube subtitles, and more) |
 | ⚡ **Smart silence skip** | Automatically skips silent segments |
 | 🔊 **Volume normalization** | Balances loudness across tracks |
 | 🎛️ **Tempo & pitch control** | Adjust playback speed and pitch |
@@ -82,12 +100,12 @@ The app is developed as a multi-module Kotlin project using **Media3 / ExoPlayer
 | Feature | Description |
 |---|---|
 | 🎨 **Dynamic theming** | The interface adapts to album artwork colors |
-| 🌐 **Multi-language support** | 20+ languages maintained on Crowdin |
+| 🌐 **Multi-language support** | 20+ languages maintained via community translations |
 | 🚗 **Android Auto compatible** | Integration with vehicle infotainment systems |
 | 🧩 **Widgets** | Home-screen player widgets (Glance) |
 | 🎯 **Material Design 3** | Design aligned with Google's latest guidelines |
 | 🖼️ **Artwork export** | Save high-resolution album images |
-| 🎬 **Animated artwork** | Animated covers powered by the Apple Music / OpenTune Canvas API — availability varies; check [canvas-opentune.netlify.app](https://canvas-opentune.netlify.app/) |
+| 🎬 **Animated artwork** | Animated covers powered by the Apple Music canvas API |
 | 🎧 **Spotify integration** | Import and browse Spotify playlists / library |
 | 🎤 **Song recognition** | ShazamKit-based recognition module |
 | 🤖 **PoToken support** | Handle YouTube streaming authorization tokens |
@@ -107,7 +125,7 @@ The app is developed as a multi-module Kotlin project using **Media3 / ExoPlayer
 | Networking | Ktor 3.4.2, OkHttp 5, NewPipe Extractor |
 | Images | Coil 3.4.0 |
 | Build | Android Gradle Plugin 9.1.0, Gradle wrapper 9.4.1, JDK 21 |
-| Other | Glance widgets, Reorderable, Haze, Squiggly Slider, Timber |
+| Other | Glance widgets, Reorderable, Haze, Squiggly Slider, Timber, Jsoup |
 
 ---
 
@@ -128,16 +146,34 @@ Multi-module Gradle project — the app itself plus library modules:
 | `simpmusic` | SimpMusic lyrics provider |
 | `canvas` | Animated artwork (Apple Music canvas) support |
 | `shazamkit` | Song recognition |
-| `jossredconnect` | Streaming / download helper libraries |
+| `jossredconnect` | Streaming / download helper library |
 
-### Downloads architecture
+---
 
-Downloads use a dedicated, app-owned pipeline instead of Media3's download-to-disk:
+## Downloads Architecture
 
-- `playback/LocalFileDownloader.kt` — `@Singleton` downloader; exposes `progress: StateFlow<Map<String, LocalDownloadState>>`; `download(songId, title, artist)` streams the raw audio through the resolver-equipped OkHttp client and saves it to **MediaStore (`Music/NovaMusic/`)**; `deleteLocalFile(songId)` removes the file and resets the entity.
-- `playback/LocalFileDownloadWorker.kt` — WorkManager `CoroutineWorker` that fetches the downloader via a Hilt `@EntryPoint`, so downloads continue in the background and survive app close/kill.
-- Completed downloads set `isLocal = true` + `localPath` on the `SongEntity`; `Song.toMediaItem()` prefers the local file at playback time.
-- The Media3 `DownloadUtil` / `ExoDownloadService` system remains for the streaming cache (player cache) — only the download-to-disk path was replaced.
+Downloads use a dedicated, app-owned pipeline instead of Media3's
+download-to-disk:
+
+- `playback/LocalFileDownloader.kt` — `@Singleton` downloader; exposes
+  `progress: StateFlow<Map<String, LocalDownloadState>>`;
+  `download(songId, title, artist)` streams the raw audio through the
+  resolver-equipped OkHttp client and saves it to **MediaStore
+  (`Music/NovaMusic/`)**; `deleteLocalFile(songId)` removes the file and
+  resets the entity. Downloads verify HTTP response content-type, byte
+  completeness against `Content-Length`, and the audio container's magic
+  header before being marked complete — a corrupted or truncated file is
+  rejected and rolled back rather than saved.
+- `playback/LocalFileDownloadWorker.kt` — WorkManager `CoroutineWorker` that
+  fetches the downloader via a Hilt `@EntryPoint`, so downloads continue in
+  the background and survive app close/kill. A foreground notification shows
+  per-song progress (with a cancel action) and groups multiple active
+  downloads into a single summary notification.
+- Completed downloads set `isLocal = true` + `localPath` on the `SongEntity`;
+  `Song.toMediaItem()` prefers the local file at playback time.
+- The Media3 `DownloadUtil` / `ExoDownloadService` system remains for the
+  streaming cache (player cache) — only the download-to-disk path was
+  replaced.
 
 ---
 
@@ -151,38 +187,19 @@ Downloads use a dedicated, app-owned pipeline instead of Media3's download-to-di
 | Network | Internet connection for streaming |
 | Storage | Varies with library size; downloaded files live in `Music/NovaMusic/` |
 
-### Installation Methods
+### Install from GitHub Releases
 
-#### Option 1: GitHub Releases (Recommended)
+GitHub Releases is the current (and only) distribution channel:
 
-1. Go to the [Releases](https://github.com/Arturo254/OpenTune/releases) page on GitHub
+1. Go to the [Releases](https://github.com/CodeWithTayyab96/NovaMusic-/releases)
+   page
 2. Download the APK for the latest stable version
+   (`app-universal-release.apk`)
 3. Enable "Install from unknown sources" in your device's security settings
 4. Open the downloaded APK to install
 
-#### Option 2: Official Website
-
-1. Visit the official [OpenTune website](https://opentune.netlify.app/)
-2. Select the Android download option
-3. Follow the installation instructions provided
-
-#### Option 3: F-Droid
-
-<div align="center">
-
-[<img src="https://f-droid.org/badge/get-it-on.png" alt="Get it on F-Droid" height="80">](https://f-droid.org/packages/com.novamusic.app)
-
-</div>
-
-#### Option 4: OpenApk
-
-<div align="center">
-
-[<img src="https://www.openapk.net/images/openapk-badge.png" alt="Get it on OpenApk" height="80">](https://www.openapk.net/opentune/com.novamusic.app/)
-
-</div>
-
-> **Security notice**: Only install the app from the official channels listed above. Avoid APKs from unverified sources.
+> **Security notice**: Only install the app from the official GitHub Releases
+> page. Avoid APKs from unverified sources.
 
 ---
 
@@ -199,11 +216,16 @@ Downloads use a dedicated, app-owned pipeline instead of Media3's download-to-di
 
 No Gradle installation or version pinning is needed: always use `./gradlew`.
 
-> **Note**: The foojay toolchain auto-provisioning plugin is disabled in `settings.gradle.kts` (for F-Droid compatibility), so your JDK itself must be version 21 — a JDK 17 installation will fail with "No matching toolchains found".
+> **Note**: The foojay toolchain auto-provisioning plugin is disabled in
+> `settings.gradle.kts` (for F-Droid compatibility), so your JDK itself must
+> be version 21 — a JDK 17 installation will fail with "No matching
+> toolchains found".
 
 ### Build
 
-This project defines **ABI product flavors** — `universal`, `arm64`, `armeabi`, `x86`, `x86_64` — so there is no plain `assembleDebug` task. Use a flavor-specific task:
+This project defines **ABI product flavors** — `universal`, `arm64`,
+`armeabi`, `x86`, `x86_64` — so there is no plain `assembleDebug` task. Use a
+flavor-specific task:
 
 ```bash
 # Debug APK containing all ABIs (the common choice for testing)
@@ -224,7 +246,13 @@ This project defines **ABI product flavors** — `universal`, `arm64`, `armeabi`
 ./gradlew clean
 ```
 
-APKs are produced under `app/build/outputs/apk/<flavor>/<buildType>/`, e.g. `app/build/outputs/apk/universal/debug/app-universal-debug.apk`.
+On low-memory machines (≈8 GB or less), a full `./gradlew build` can exhaust
+the heap while compiling all ten variant combos — use
+`./gradlew build --no-parallel --max-workers=2` in that case (this is what
+CI does).
+
+APKs are produced under `app/build/outputs/apk/<flavor>/<buildType>/`, e.g.
+`app/build/outputs/apk/universal/debug/app-universal-debug.apk`.
 
 ### Build from Android Studio
 
@@ -234,106 +262,99 @@ APKs are produced under `app/build/outputs/apk/<flavor>/<buildType>/`, e.g. `app
 
 ---
 
+## Releases & the In-App Updater
+
+- NovaMusic has its own version history starting at **1.0.0**
+  (`versionCode 1`), independent of the OpenTune 3.0.6 numbering it forked
+  from.
+- The in-app updater (`utils/Updater.kt`) checks the latest **stable** release
+  of `CodeWithTayyab96/NovaMusic-` and compares it against the app's
+  `versionName` using semver. **For an update to be recognized, the release
+  tag must match the app's `versionName`** (e.g. release tag `v1.0.1` + app
+  `versionName "1.0.1"`), and `versionCode` should be bumped so Android
+  allows installing over the previous APK.
+- Release assets must be named exactly **`app-universal-release.apk`** — the
+  updater constructs its download URL from that name.
+
+---
+
 ## Continuous Integration
 
-The repository includes GitHub Actions workflows in `.github/workflows/`:
+GitHub Actions workflows live in `.github/workflows/`:
 
-- **`build.yml`** — triggered on push to `main`/`master` and manual `workflow_dispatch`:
-  - **Build Debug APK** job: `ubuntu-latest`, JDK 21 (Temurin) with Gradle cache, `./gradlew assembleUniversalDebug`, then uploads the APK from `app/build/outputs/apk/universal/debug/` as an artifact.
-  - **Full build + unit tests** job: runs `./gradlew build` (all variants + tests). It is intentionally **independent** of the APK job, so test failures never block the APK artifact.
-- **`android.yml`** — manual build workflow
-- **`pr-debug-build.yml`** — debug build on every pull request
+- **`build.yml`** — runs on push to `main`/`master` and manual
+  `workflow_dispatch`:
+  - **Build Debug APK** job: JDK 21 (Temurin), `./gradlew assembleUniversalDebug`,
+    uploads the APK from `app/build/outputs/apk/universal/debug/` as an artifact.
+  - **Full build + unit tests** job: `./gradlew build --no-parallel --max-workers=2`
+    (all variants + tests). Intentionally independent of the APK job, so test
+    failures never block the APK artifact.
+- **`release-build.yml`** — manual only. Prompts for a `version` input (e.g.
+  `v1.0.1`), decodes the signing keystore from the `KEYSTORE_BASE64` secret,
+  builds `assembleUniversalRelease`, publishes a GitHub Release tagged with
+  the version, uploads the APK as an asset, and deletes the decoded keystore
+  from the runner afterward.
+- **`generate-keystore.yml`** — manual one-time helper that generates a
+  release keystore with `keytool` and uploads it as a temporary artifact.
+- **`android.yml`** — manual `assembleArm64Debug` build.
+- **`pr-debug-build.yml`** — debug build on every pull request.
+
+---
+
+## Support
+
+- **Bug reports & feature requests**: open an issue on the
+  [issue tracker](https://github.com/CodeWithTayyab96/NovaMusic-/issues).
+- **Releases**: see the [Releases](https://github.com/CodeWithTayyab96/NovaMusic-/releases)
+  page.
 
 ---
 
 ## Contributing
 
-### Code of Conduct
-
-All participants must follow our [Code of Conduct](https://github.com/Arturo254/OpenTune/blob/master/CODE_OF_CONDUCT.md), which promotes an inclusive, respectful, and constructive environment.
-
-### Translation
-
-Help translate OpenTune into your language or improve existing translations:
-
-<div align="center">
-
-[![POEditor](https://img.shields.io/badge/POEditor-2196F3?style=for-the-badge&logo=translate&logoColor=white)](https://poeditor.com/join/project/208BwCVazA)
-[![Crowdin](https://img.shields.io/badge/Crowdin-2E3440?style=for-the-badge&logo=crowdin&logoColor=white)](https://crowdin.com/project/opentune)
-
-</div>
-
-### Community Channels
-
-<div align="center">
-
-[![Telegram Chat](https://img.shields.io/badge/Telegram-Chat-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/OpenTune_chat)
-[![Telegram Updates](https://img.shields.io/badge/Telegram-Updates-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/opentune_updates)
-
-</div>
-
-### Development Workflow
-
-1. Check [open issues](https://github.com/Arturo254/OpenTune/issues) or create a new one
-2. Fork the repository and create a feature branch (`git checkout -b feature/...`)
-3. Implement your changes following the project's Kotlin/Compose conventions
-4. Run the unit tests and build (`./gradlew test` / `./gradlew build`)
-5. Commit with a descriptive message and push to your fork
-6. Open a Pull Request referencing the related issue
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contribution guide.
+Contributions are welcome! Please read
+[CONTRIBUTING.md](CONTRIBUTING.md) and our
+[Code of Conduct](CODE_OF_CONDUCT.md) first, then open an issue or a pull
+request on the [repository](https://github.com/CodeWithTayyab96/NovaMusic-).
 
 ---
 
-## Support the Project
+## Upstream Attribution
 
-If OpenTune is valuable to you, consider donating. Support helps with:
+NovaMusic is a fork of **[OpenTune](https://github.com/Arturo254/OpenTune)**
+(by Arturo Cervantes), which in turn descends from the
+[InnerTune](https://github.com/z-huang/InnerTune) / ArchiveTune project
+lineage. NovaMusic builds directly on OpenTune 3.0.6 and inherits its
+architecture, features, and community translations. All original copyright
+and license notices are preserved in the source files.
 
-- New features and improvements
-- Bug fixes and performance optimization
-- Infrastructure and maintenance
+Special thanks to the upstream projects and people:
 
-<div align="center">
-
-[![GitHub Sponsors](https://img.shields.io/badge/GitHub_Sponsors-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sponsors/Arturo254)
-[![PayPal](https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](mailto:cervantesarturo254@gmail.com)
-
-</div>
-
-> Donations are completely optional — OpenTune will always be free and open source.
-
----
-
-## Acknowledgments
-
-Special thanks to:
-
-- **[ArchiveTune](https://github.com/koiverse/ArchiveTune)** — base project and inspiration for many ideas
-- **[Vivi Music](https://github.com/vivizzz007/vivi-music)** — source of the Canvas API and inspiration
-- **[@Fabito02](https://github.com/Fabito02)** — constant support, feedback, and ideas
+- **OpenTune** (Arturo254/OpenTune) — the direct upstream base of this app
+- **InnerTune** / **ArchiveTune** — the original project lineage
+- **Vivi Music** — source of the Canvas API and inspiration
+- **@Fabito02** — constant support, feedback, and ideas
 - **mostafaalagamy** — MetroList implementation
-- **Community translators** — making OpenTune accessible worldwide
+- **Community translators** — making the app accessible worldwide
 - **Beta testers** — improving stability and usability
 
 ---
 
 ## License
 
-**Copyright © 2025 Arturo Cervantes**
+NovaMusic is licensed under the **GNU General Public License v3.0** (or later),
+inherited from its upstream projects. This is copyleft: you are free to use,
+study, modify, and redistribute the app, provided any derivative works are
+also released under GPLv3 and preserve the original copyright and license
+notices.
 
-This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+**Copyright © 2025 Arturo Cervantes (OpenTune)** — the upstream base.
 
-This program is distributed in the hope that it will be useful, but **WITHOUT ANY WARRANTY**; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the [GNU General Public License](https://github.com/Arturo254/OpenTune/blob/main/LICENSE) for more details.
+Full license text: [LICENSE](LICENSE) ·
+[GPL v3](https://www.gnu.org/licenses/gpl-3.0)
 
 <div align="center">
 
 [![GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge&logo=gnu&logoColor=white)](https://www.gnu.org/licenses/gpl-3.0)
 
-</div>
-
----
-
-<div align="center">
-  <p><strong>© 2023-2025 Open Source Project</strong></p>
-  <p>Developed with passion by <a href="https://github.com/Arturo254">Arturo Cervantes</a></p>
 </div>

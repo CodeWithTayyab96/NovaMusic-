@@ -1,9 +1,8 @@
 ---
 name: Bug Report
-about: Reporta un problema en OpenTune
+about: Reporta un problema en NovaMusic
 title: "[BUG] "
 labels: bug
-assignees: Arturo254
 ---
 
 ## Descripción
@@ -28,7 +27,7 @@ assignees: Arturo254
 
 | Campo | Valor |
 |---|---|
-| Versión de OpenTune | <!-- Ej: 1.2.3 --> |
+| Versión de NovaMusic | <!-- Ej: 1.0.0 --> |
 | Versión de Android | <!-- Ej: Android 14 --> |
 | Dispositivo | <!-- Ej: Pixel 8 Pro --> |
 
@@ -45,7 +44,7 @@ assignees: Arturo254
 ## Logs
 
 <!-- Opcional. Filtra logs relevantes con:
-adb logcat | grep -i opentune
+adb logcat | grep -i novamusic
 -->
 
 ```
@@ -55,5 +54,5 @@ pega los logs aquí
 ## Checklist
 
 - [ ] Verifiqué que no existe un reporte duplicado
-- [ ] Estoy usando la última versión de OpenTune
+- [ ] Estoy usando la última versión de NovaMusic
 - [ ] Puedo reproducir el problema
