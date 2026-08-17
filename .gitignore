@@ -54,10 +54,12 @@ captures/
 # Comment next line if keeping position of elements in Navigation Editor is relevant for you
 .idea/navEditor.xml
 
-# Keystore files
-# Uncomment the following lines if you do not want to check your keystore files in.
-#*.jks
-#*.keystore
+# Keystore files — the decoded release keystore must never be committed.
+# The release-build workflow writes it to app/keystore/ on an ephemeral runner
+# and deletes it after the build; locally it is generated/placed by hand.
+app/keystore/
+*.jks
+*.keystore
 
 # External native build folder generated in Android Studio 2.2 and later
 .externalNativeBuild

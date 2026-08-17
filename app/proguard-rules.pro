@@ -125,3 +125,11 @@
 -dontwarn javax.imageio.**
 -dontwarn javax.swing.**
 -keep class org.jaudiotagger.** { *; }
+
+## Room Database
+# Keep Room database, entities and auto-migration specs from being renamed/
+# stripped — entities are mapped from Cursor rows by reflection and the
+# @AutoMigration specs are discovered at runtime.
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class *
+-keep class * extends androidx.room.AutoMigrationSpec
