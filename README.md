@@ -2,11 +2,13 @@
 
 <div align="center">
 
+  <img src="assets/banner.png" alt="NovaMusic Banner" width="100%"/>
+
   ### Advanced YouTube Music client with Material Design 3 for Android
 
   [![Latest Release](https://img.shields.io/github/v/release/CodeWithTayyab96/NovaMusic-?style=flat-square&logo=github&color=0D1117&labelColor=161B22)](https://github.com/CodeWithTayyab96/NovaMusic-/releases)
   [![License](https://img.shields.io/github/license/CodeWithTayyab96/NovaMusic-?style=flat-square&logo=gnu&color=2B3137&labelColor=161B22)](https://github.com/CodeWithTayyab96/NovaMusic-/blob/main/LICENSE)
-  [![Android](https://img.shields.io/badge/Platform-Android%208.0+-3DDC84.svg?style=flat-square&logo=android&logoColor=white&labelColor=161B22)](https://www.android.com)
+  [![Android](https://img.shields.io/badge/Platform-Android%208.0+-3DC84.svg?style=flat-square&logo=android&logoColor=white&labelColor=161B22)](https://www.android.com)
   [![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white&labelColor=161B22)](.github/workflows/build.yml)
 
 </div>
