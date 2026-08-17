@@ -350,7 +350,7 @@ fun YearInMusicScreen(
                     // Brand label — centered
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text       = "OpenTune",
+                            text       = "NovaMusic",
                             style      = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color      = SnowDim,
@@ -398,7 +398,7 @@ fun YearInMusicScreen(
                                 } else raw
                                 val fitted = ComposeToImage.fitBitmap(cropped, 1080, 1920, shareArgb)
                                 val uri    = ComposeToImage.saveBitmapAsFile(
-                                    context, fitted, "OpenTune_Insight_$selectedYear"
+                                    context, fitted, "NovaMusic_Insight_$selectedYear"
                                 )
                                 context.startActivity(
                                     Intent.createChooser(
@@ -1456,7 +1456,7 @@ private fun SummaryPage(
                     }
                     Column {
                         Text(
-                            "OpenTune Insight",
+                            "NovaMusic Insight",
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold,
                             color = Snow,
@@ -1563,12 +1563,12 @@ private fun SummaryPage(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    joinByBullet("OpenTune", year.toString()),
+                    joinByBullet("NovaMusic", year.toString()),
                     style = MaterialTheme.typography.labelSmall,
                     color = SnowDim,
                 )
                 Text(
-                    "OpenTune Insight",
+                    "NovaMusic Insight",
                     style = MaterialTheme.typography.labelSmall,
                     color = SnowDim,
                 )

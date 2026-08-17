@@ -238,7 +238,7 @@ object Updater {
             client.get("https://api.github.com/repos/CodeWithTayyab96/NovaMusic-/releases?per_page=$perPage") {
                 headers {
                     append("Accept", "application/vnd.github+json")
-                    append("User-Agent", "OpenTune")
+                    append("User-Agent", "NovaMusic")
                     if (!cachedEtag.isNullOrBlank()) {
                         append("If-None-Match", cachedEtag)
                     }
@@ -328,7 +328,7 @@ object Updater {
             ) {
                 headers {
                     append("Accept", "application/vnd.github+json")
-                    append("User-Agent", "OpenTune")
+                    append("User-Agent", "NovaMusic")
                 }
             }.bodyAsText()
 
@@ -393,7 +393,7 @@ object Updater {
                 client.get("https://api.github.com/repos/CodeWithTayyab96/NovaMusic-/commits?sha=$branch&per_page=$count") {
                     headers {
                         append("Accept", "application/vnd.github+json")
-                        append("User-Agent", "OpenTune")
+                        append("User-Agent", "NovaMusic")
                     }
                 }.bodyAsText()
             val jsonArray = JSONArray(response)

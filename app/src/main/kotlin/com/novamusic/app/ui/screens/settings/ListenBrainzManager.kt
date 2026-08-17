@@ -88,7 +88,7 @@ object ListenBrainzManager {
                     .joinToString(" & ")
                 val releaseName = song.album?.title ?: ""
                 val releasePart = if (releaseName.isBlank()) "" else "\"release_name\":\"${escapeJson(releaseName)}\","
-                val trackMetadata = "{\"track_metadata\":{\"artist_name\":\"${escapeJson(artistNames)}\",\"track_name\":\"${escapeJson(song.title)}\",${releasePart}\"additional_info\":{\"duration_ms\":$durationMs,\"position_ms\":$positionMs,\"submission_client\":\"OpenTune\"}}}"
+                val trackMetadata = "{\"track_metadata\":{\"artist_name\":\"${escapeJson(artistNames)}\",\"track_name\":\"${escapeJson(song.title)}\",${releasePart}\"additional_info\":{\"duration_ms\":$durationMs,\"position_ms\":$positionMs,\"submission_client\":\"NovaMusic\"}}}"
                 val listensJson = "[$trackMetadata]"
                 val bodyJson = "{\"listen_type\":\"playing_now\",\"payload\":$listensJson}"
                 Timber.tag(logTag).d("submitPlayingNow JSON: %s", bodyJson)
@@ -138,7 +138,7 @@ object ListenBrainzManager {
                     Timber.tag(logTag).w("listened_at %s looks too small, replacing with current epoch seconds", listenedAtStart)
                     listenedAtStart = System.currentTimeMillis() / 1000L
                 }
-                val trackMetadataSingle = "{\"listened_at\":$listenedAtStart,\"track_metadata\":{\"artist_name\":\"${escapeJson(artistNames)}\",\"track_name\":\"${escapeJson(song.title)}\",${releasePart}\"additional_info\":{\"duration_ms\":$durationMs,\"start_ms\":$startMs,\"end_ms\":$endMs,\"submission_client\":\"OpenTune\"}}}"
+                val trackMetadataSingle = "{\"listened_at\":$listenedAtStart,\"track_metadata\":{\"artist_name\":\"${escapeJson(artistNames)}\",\"track_name\":\"${escapeJson(song.title)}\",${releasePart}\"additional_info\":{\"duration_ms\":$durationMs,\"start_ms\":$startMs,\"end_ms\":$endMs,\"submission_client\":\"NovaMusic\"}}}"
                 val listensJson = "[$trackMetadataSingle]"
                 val bodyJson = "{\"listen_type\":\"single\",\"payload\":$listensJson}"
                 Timber.tag(logTag).d("submitFinished JSON: %s", bodyJson)

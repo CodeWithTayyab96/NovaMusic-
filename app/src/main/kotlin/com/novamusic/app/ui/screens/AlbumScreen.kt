@@ -181,7 +181,7 @@ suspend fun downloadAlbumCover(
             put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/OpenTune")
+                put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/NovaMusic")
                 put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
         }

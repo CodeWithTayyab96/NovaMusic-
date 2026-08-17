@@ -9,33 +9,24 @@ package com.novamusic.app.together
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.okhttp.OkHttp
-import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsText
 import java.net.URI
-import java.util.concurrent.TimeUnit
+import timber.log.Timber
 import com.novamusic.app.constants.TogetherOnlineEndpointCacheKey
 import com.novamusic.app.constants.TogetherOnlineEndpointLastCheckedAtKey
 import com.novamusic.app.utils.getAsync
 
 object TogetherOnlineEndpoint {
-    private const val EndpointSourceUrl =
-        "https://raw.githubusercontent.com/Arturo254/OpenTune/refs/heads/master/OpenTuneServer.txt"
-
     private const val CacheTtlMs: Long = 6 * 60 * 60 * 1000L
 
-    private val httpClient =
-        HttpClient(OkHttp) {
-            engine {
-                config {
-                    connectTimeout(12, TimeUnit.SECONDS)
-                    readTimeout(12, TimeUnit.SECONDS)
-                    writeTimeout(12, TimeUnit.SECONDS)
-                    retryOnConnectionFailure(true)
-                }
-            }
-        }
+    /**
+     * The Together online feature is currently DISABLED.
+     *
+     * It previously resolved its server by downloading OpenTuneServer.txt from the
+     * upstream OpenTune repository — infrastructure NovaMusic does not control.
+     * Until NovaMusic hosts its own Together endpoint, [baseUrlOrNull] always
+     * returns null and the UI surfaces the "Online sessions aren't configured"
+     * state instead of silently pointing at a server we don't own.
+     */
 
     suspend fun baseUrlOrNull(
         dataStore: DataStore<Preferences>,
@@ -69,26 +60,8 @@ object TogetherOnlineEndpoint {
     }
 
     private suspend fun fetchEndpointFromSourceOrNull(): String? {
-        val text =
-            runCatching { httpClient.get(EndpointSourceUrl).bodyAsText() }
-                .getOrNull()
-                ?.trim()
-                .orEmpty()
-        if (text.isBlank()) return null
-
-        val candidate =
-            text.lineSequence()
-                .map { it.trim() }
-                .firstOrNull { it.isNotBlank() }
-                ?: return null
-
-        val uri = runCatching { URI(candidate) }.getOrNull() ?: return null
-        val scheme = uri.scheme?.trim()?.lowercase()
-        if (scheme != "http" && scheme != "https") return null
-        val host = uri.host?.trim().orEmpty()
-        if (host.isBlank()) return null
-
-        return candidate.trimEnd('/')
+        Timber.w("Together online sessions are disabled — no NovaMusic endpoint is configured.")
+        return null
     }
 
     fun onlineWebSocketUrlOrNull(

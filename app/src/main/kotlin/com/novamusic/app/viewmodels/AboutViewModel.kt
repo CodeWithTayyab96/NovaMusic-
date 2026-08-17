@@ -47,7 +47,7 @@ class AboutViewModel : ViewModel() {
 
             val result = withContext(Dispatchers.IO) {
                 try {
-                    val url = URL("https://api.github.com/repos/Arturo254/OpenTune/contributors")
+                    val url = URL("https://api.github.com/repos/CodeWithTayyab96/NovaMusic-/contributors")
                     val connection = url.openConnection() as HttpURLConnection
                     connection.requestMethod = "GET"
                     connection.connectTimeout = 5000

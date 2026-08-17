@@ -299,7 +299,7 @@ fun buildSettingsGroups(
                         SettingsItem(
                             icon = painterResource(R.drawable.info),
                             title = stringResource(R.string.about),
-                            subtitle = "OpenTune",
+                            subtitle = "NovaMusic",
                             accentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             keywords = listOf("about", "app info", "license", "contributors"),
                             onClick = { resetSearch(); navController.navigate("settings/about") },

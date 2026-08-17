@@ -65,7 +65,7 @@ class FilebinService(
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
             // Crear un bin name único basado en timestamp y nombre de app
-            val binName = "opentune_backup_${System.currentTimeMillis()}"
+            val binName = "novamusic_backup_${System.currentTimeMillis()}"
             val fileName = file.name
             
             // Construir la request multipart

@@ -220,29 +220,8 @@ fun AboutScreen(
                     links = listOf(
                         SocialLink(
                             R.drawable.github,
-                            "https://github.com/Arturo254/OpenTune",
+                            "https://github.com/CodeWithTayyab96/NovaMusic-",
                             "GitHub"
-                        ),
-                        SocialLink(
-                            R.drawable.telegram,
-                            "https://t.me/opentune_updates",
-                            "Telegram"
-                        ),
-                        SocialLink(
-                            R.drawable.facebook,
-                            "https://www.facebook.com/Arturo254",
-                            "Facebook"
-                        ),
-                        SocialLink(R.drawable.paypal, "https://www.paypal.me/OpenTune", "PayPal"),
-                        SocialLink(
-                            R.drawable.instagram,
-                            "https://www.instagram.com/arturocg.dev/",
-                            "Instagram"
-                        ),
-                        SocialLink(
-                            R.drawable.resource_public,
-                            "https://opentune.netlify.app/",
-                            "Website"
                         ),
                     ),
                     onLinkClick = { uriHandler.openUri(it) },
@@ -293,7 +272,7 @@ fun AboutScreen(
             item(key = "license") {
                 LicenseFooterExpressive(
                     onLicenseClick = {
-                        uriHandler.openUri("https://github.com/Arturo254/OpenTune/blob/master/LICENSE")
+                        uriHandler.openUri("https://github.com/CodeWithTayyab96/NovaMusic-/blob/main/LICENSE")
                     }
                 )
             }

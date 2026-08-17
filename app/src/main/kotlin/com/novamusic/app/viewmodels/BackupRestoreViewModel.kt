@@ -809,7 +809,7 @@ class BackupRestoreViewModel @Inject constructor(
 
         try {
             // Crear un bin name único basado en timestamp
-            val binName = "opentune_backup_${System.currentTimeMillis()}"
+            val binName = "novamusic_backup_${System.currentTimeMillis()}"
             val fileName = file.name
 
             // Crear el request body con progreso personalizado

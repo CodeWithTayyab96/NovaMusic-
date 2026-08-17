@@ -607,18 +607,13 @@ private fun BuildChannelInfoDialog(
         title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                Text("OpenTune provides two download channels for builds:", style = MaterialTheme.typography.bodyMedium)
+                Text("NovaMusic provides stable builds distributed via GitHub Releases:", style = MaterialTheme.typography.bodyMedium)
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text("• Stable builds", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                    Text("Distributed via official GitHub Releases.", style = MaterialTheme.typography.bodySmall)
+                    Text("Distributed via the official GitHub Releases of this repository.", style = MaterialTheme.typography.bodySmall)
                     Text("These versions are tested and recommended for most users.", style = MaterialTheme.typography.bodySmall)
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("• Nightly builds", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                    Text("Automatically generated development builds hosted via nightly.link.", style = MaterialTheme.typography.bodySmall)
-                    Text("Nightly builds may include experimental features, unfinished changes, or temporary regressions.", style = MaterialTheme.typography.bodySmall)
-                }
-                Text("By continuing, you acknowledge that nightly builds may be unstable and use them at your own risk.", style = MaterialTheme.typography.bodySmall)
+                Text("Updates are checked automatically and installed through the in-app updater.", style = MaterialTheme.typography.bodySmall)
             }
         },
         confirmButton = { TextButton(onClick = onConfirm) { Text(stringResource(android.R.string.ok)) } },

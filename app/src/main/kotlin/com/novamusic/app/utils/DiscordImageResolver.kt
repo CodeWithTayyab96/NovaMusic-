@@ -179,7 +179,7 @@ object DiscordImageResolver {
                     ?: song.artists.firstOrNull()?.thumbnailUrl?.takeIf { it.isValidHttpUrl() }?.let { RpcImage.ExternalImage(it) }
             }
             "appicon" -> {
-                RpcImage.ExternalImage("https://raw.githubusercontent.com/Arturo254/OpenTune/refs/heads/master/assets/icon.png")
+                RpcImage.ExternalImage("https://raw.githubusercontent.com/CodeWithTayyab96/NovaMusic-/refs/heads/main/assets/icon.png")
             }
             "custom" -> {
                 val url = customUrl?.takeIf { it.isNotBlank() && it.isValidHttpUrl() }
