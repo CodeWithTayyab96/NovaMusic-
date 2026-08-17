@@ -65,6 +65,16 @@ jobs:
       - name: Grant execute permission to gradlew
         run: chmod +x gradlew
 
+      # `./gradlew build` compiles RELEASE variants too, and the release
+      # buildType is signed (signingConfig "release" in app/build.gradle.kts),
+      # so the signing keystore must exist here as well — otherwise release
+      # packaging fails with "signingConfigData.storeFile ... doesn't exist".
+      - name: Decode keystore from secret
+        run: |
+          mkdir -p app/keystore
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/keystore/release.keystore
+          test -s app/keystore/release.keystore || { echo "::error::Decoded keystore is empty — is KEYSTORE_BASE64 set (Settings > Secrets and variables > Actions) and valid base64?"; exit 1; }
+
       # Runs assemble + unit tests (+ lint, which has abortOnError=false here)
       # for every ABI flavor / build type. Slow but comprehensive.
       #
@@ -75,4 +85,12 @@ jobs:
       # exceeded during release-variant codegen. Serializing the compile keeps
       # it well within the 16GB runner.
       - name: Build all variants + run unit tests
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew build --no-daemon --stacktrace --no-parallel --max-workers=2
+
+      - name: Clean up keystore (always)
+        if: always()
+        run: rm -f app/keystore/release.keystore
