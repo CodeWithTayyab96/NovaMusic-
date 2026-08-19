@@ -9,6 +9,7 @@ package com.novamusic.app.ui.screens.settings
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -140,6 +141,28 @@ fun UpdateScreen(
 
     var downloadProgress by remember { mutableFloatStateOf(0f) }
     var isDownloading by remember { mutableStateOf(false) }
+    var downloadError by remember { mutableStateOf<String?>(null) }
+
+    val installPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { _ ->
+        if (Updater.isInstallPermissionGranted(context)) {
+            val pending = pendingUpdateInfo
+            if (pending != null) {
+                val destination = File(context.cacheDir, "update.apk")
+                if (destination.exists() && destination.length() > 0) {
+                    try {
+                        Updater.installApk(context, destination)
+                    } catch (e: Exception) {
+                        Toast.makeText(context, context.getString(R.string.install_error, e.message), Toast.LENGTH_LONG).show()
+                        Updater.cleanupDownloadedApk(destination)
+                    }
+                }
+            }
+        } else {
+            Toast.makeText(context, context.getString(R.string.install_permission_required), Toast.LENGTH_LONG).show()
+        }
+    }
 
     var showNotifConfirmDialog by remember { mutableStateOf(false) }
     var hasNotificationPermission by remember {
@@ -187,15 +210,41 @@ fun UpdateScreen(
                 info = info,
                 isDownloading = isDownloading,
                 progress = downloadProgress,
+                downloadError = downloadError,
                 onDownload = {
+                    downloadError = null
                     coroutineScope.launch {
                         isDownloading = true
+                        downloadProgress = 0f
                         val destination = File(context.cacheDir, "update.apk")
-                        Updater.downloadApk(info.downloadUrl, destination).collectLatest {
-                            downloadProgress = it
+                        try {
+                            Updater.downloadApk(info.downloadUrl, destination).collectLatest {
+                                downloadProgress = it
+                            }
+                            // Verify the downloaded file is valid
+                            if (!destination.exists() || destination.length() == 0L) {
+                                downloadError = context.getString(R.string.download_error_empty)
+                                isDownloading = false
+                                return@launch
+                            }
+                            isDownloading = false
+                            // Check install permission
+                            if (Updater.isInstallPermissionGranted(context)) {
+                                try {
+                                    Updater.installApk(context, destination)
+                                } catch (e: Exception) {
+                                    downloadError = context.getString(R.string.install_error, e.message)
+                                    Updater.cleanupDownloadedApk(destination)
+                                }
+                            } else {
+                                // Direct user to settings to grant install permission
+                                installPermissionLauncher.launch(Updater.getInstallPermissionSettingsIntent())
+                            }
+                        } catch (e: Exception) {
+                            isDownloading = false
+                            downloadError = context.getString(R.string.download_error, e.message ?: "Unknown error")
+                            Updater.cleanupDownloadedApk(destination)
                         }
-                        isDownloading = false
-                        Updater.installApk(context, destination)
                     }
                 },
                 onDismiss = { if (!isDownloading) showUpdateBottomSheet = false }
@@ -477,6 +526,7 @@ private fun UpdateDetailsBottomSheet(
     info: UpdateInfo,
     isDownloading: Boolean,
     progress: Float,
+    downloadError: String?,
     onDownload: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -513,6 +563,34 @@ private fun UpdateDetailsBottomSheet(
             )
 
             Spacer(Modifier.height(24.dp))
+
+            if (!downloadError.isNullOrEmpty()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = downloadError,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = onDownload,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text(stringResource(R.string.retry), fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
 
             if (isDownloading) {
                 Column(

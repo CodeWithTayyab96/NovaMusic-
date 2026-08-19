@@ -742,6 +742,10 @@ NovaMusic will only extract your token, and everything else is stored locally.</
     <string name="update_notification_title">Update Available</string>
     <string name="update_notification_text">NovaMusic %s is now available</string>
     <string name="download">Download</string>
+    <string name="download_error">Download failed: %s</string>
+    <string name="download_error_empty">Downloaded file is empty. Please try again.</string>
+    <string name="install_error">Installation failed: %s</string>
+    <string name="install_permission_required">Permission to install apps is required. Please grant it in Settings.</string>
 
     <string name="permissions_title">Allow NovaMusic to work best</string>
     <string name="permissions_subtitle">We use a few permissions to play and manage your music reliably. You can change these anytime in system settings.</string>

@@ -34,7 +34,7 @@ fun fetchGitCommitHash(): String {
     // Fallback: Obtener del repositorio remoto de GitHub sin dependencias externas
     return try {
         println("Fetching latest commit from GitHub API...")
-        val url = URL("https://api.github.com/repos/CodeWithTayyab96/NovaMusic/commits/master")
+        val url = URL("https://api.github.com/repos/CodeWithTayyab96/NovaMusic-/commits/main")
         val connection = url.openConnection() as HttpURLConnection
         connection.requestMethod = "GET"
         connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
@@ -251,8 +251,8 @@ dependencies {
     implementation(libs.viewmodel)
     implementation(libs.viewmodel.compose)
 
-    implementation("io.ktor:ktor-client-content-negotiation:3.0.3")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.3")
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.json)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
 
     implementation(libs.material3)

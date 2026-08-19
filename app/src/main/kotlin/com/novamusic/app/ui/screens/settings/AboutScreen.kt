@@ -491,36 +491,74 @@ private fun HeroCardExpressive(shimmerBrush: Brush) {
 
 @Composable
 private fun DeveloperInfoExpressive() {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.tertiaryContainer,
-            modifier = Modifier.size(44.dp),
+        // Current maintainer
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            AsyncImage(
-                model = "https://avatars.githubusercontent.com/u/87346871?v=4",
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(CircleShape),
-            )
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.tertiaryContainer,
+                modifier = Modifier.size(44.dp),
+            ) {
+                AsyncImage(
+                    model = "https://avatars.githubusercontent.com/CodeWithTayyab96",
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape),
+                )
+            }
+            Column {
+                Text(
+                    text = "CodeWithTayyab96",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Maintainer",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
-        Column {
-            Text(
-                text = "Arturo Cervantes",
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                text = "Lead Developer",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        // Upstream attribution
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                modifier = Modifier.size(44.dp),
+            ) {
+                AsyncImage(
+                    model = "https://avatars.githubusercontent.com/u/87346871?v=4",
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape),
+                )
+            }
+            Column {
+                Text(
+                    text = "Built on OpenTune",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "by Arturo Cervantes (Arturo254)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

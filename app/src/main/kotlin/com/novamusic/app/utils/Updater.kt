@@ -10,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.core.content.FileProvider
 import androidx.datastore.preferences.core.edit
 import com.novamusic.app.BuildConfig
@@ -370,6 +371,29 @@ object Updater {
         }
     }.flowOn(Dispatchers.IO)
 
+    /**
+     * Check if the app has permission to install packages (required on Android 8+ / API 26+).
+     * On older versions this always returns true.
+     */
+    fun isInstallPermissionGranted(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.packageManager.canRequestPackageInstalls()
+        } else {
+            true
+        }
+    }
+
+    /**
+     * Returns an Intent that opens the system settings screen where the user can grant
+     * the REQUEST_INSTALL_PACKAGES permission. The caller should start this intent
+     * with an ActivityResultLauncher.
+     */
+    fun getInstallPermissionSettingsIntent(): Intent {
+        return Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+            data = Uri.parse("package:${App.instance.packageName}")
+        }
+    }
+
     fun installApk(context: Context, apkFile: File) {
         val uri = FileProvider.getUriForFile(
             context,
@@ -385,9 +409,18 @@ object Updater {
         context.startActivity(intent)
     }
 
+    /**
+     * Delete a previously downloaded APK file if it exists.
+     */
+    fun cleanupDownloadedApk(apkFile: File) {
+        if (apkFile.exists()) {
+            apkFile.delete()
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
 
-    suspend fun getCommitHistory(count: Int = 20, branch: String = "master"): Result<List<GitCommit>> =
+    suspend fun getCommitHistory(count: Int = 20, branch: String = "main"): Result<List<GitCommit>> =
         runCatching {
             val response =
                 client.get("https://api.github.com/repos/CodeWithTayyab96/NovaMusic-/commits?sha=$branch&per_page=$count") {

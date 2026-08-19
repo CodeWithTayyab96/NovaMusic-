@@ -3,7 +3,7 @@
   "extends": [
     "config:recommended"
   ],
-  "baseBranches": ["dev"],
+  "baseBranches": ["main"],
   "ignoreUnstable": true,
   "respectLatest": true,
   "separateMajorMinor": true,
@@ -21,9 +21,9 @@
       ],
       "enabled": false,
       "matchPackageNames": [
-        "/^com\\.github\\.libre\\-tube:NewPipeExtractor$/",
+        "/^com\\.github\\.TeamNewPipe:NewPipeExtractor$/",
         "/^com\\.android\\.tools\\.build:gradle$/",
-        "/^org\\.jetbrains\\.kotlin:kotlin\\-gradle\\-plugin$/"
+        "/^org\\.jetbrains\\.kotlin:kotlin-gradle-plugin$/"
       ]
     },
     {

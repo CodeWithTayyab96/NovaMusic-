@@ -117,7 +117,6 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.ExperimentalTextApi
@@ -548,7 +547,6 @@ class MainActivity : ComponentActivity() {
             val bottomSheetPageState = remember { BottomSheetPageState() }
             val (liquidGlassNavBar) = rememberPreference(LiquidGlassNavBarKey, defaultValue = false)
             val menuState = remember { MenuState() }
-            val uriHandler = LocalUriHandler.current
             val releaseNotesState = remember { mutableStateOf<String?>(null) }
             val updateSheetContent: @Composable ColumnScope.() -> Unit = { // receiver: ColumnScope
                 Text(
@@ -597,9 +595,8 @@ class MainActivity : ComponentActivity() {
 
                 Button(
                     onClick = {
-                        try {
-                            uriHandler.openUri(Updater.getLatestDownloadUrl())
-                        } catch (_: Exception) {}
+                        bottomSheetPageState.dismiss()
+                        navController.navigate("settings/update")
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) {

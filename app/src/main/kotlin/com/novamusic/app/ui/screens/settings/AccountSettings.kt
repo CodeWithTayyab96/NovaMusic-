@@ -77,7 +77,6 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -121,7 +120,7 @@ fun AccountSettings(
     latestVersionName: String
 ) {
     val context = LocalContext.current
-    val uriHandler = LocalUriHandler.current
+
 
     val (accountNamePref, onAccountNameChange) = rememberPreference(AccountNameKey, "")
     val (accountEmail, onAccountEmailChange) = rememberPreference(AccountEmailKey, "")
@@ -306,7 +305,10 @@ fun AccountSettings(
 
                     UpdateAvailableItem(
                         latestVersion = latestVersionName,
-                        onClick = { uriHandler.openUri(Updater.getLatestDownloadUrl()) }
+                        onClick = {
+                            onClose()
+                            navController.navigate("settings/update")
+                        }
                     )
                 }
             }
