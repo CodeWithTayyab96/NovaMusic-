@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.novamusic.app.R
 import com.novamusic.app.models.MediaMetadata
+import androidx.compose.ui.res.stringResource
 
 // ─────────────────────────────────────────────────────────────────────────────
 // API pública
@@ -185,7 +186,7 @@ fun LyricsShareCarouselSheet(
                         modifier = Modifier.weight(1f),
                         shape    = RoundedCornerShape(14.dp),
                     ) {
-                        Text("Guardar")
+                        Text(stringResource(R.string.save))
                     }
                 } else {
                     OutlinedButton(
@@ -193,7 +194,7 @@ fun LyricsShareCarouselSheet(
                         modifier = Modifier.weight(1f),
                         shape    = RoundedCornerShape(14.dp),
                     ) {
-                        Text("Cancelar")
+                        Text(stringResource(R.string.cancel))
                     }
                 }
                 Button(
@@ -207,7 +208,7 @@ fun LyricsShareCarouselSheet(
                         modifier           = Modifier.size(18.dp),
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text("Compartir")
+                    Text(stringResource(R.string.share))
                 }
             }
         }

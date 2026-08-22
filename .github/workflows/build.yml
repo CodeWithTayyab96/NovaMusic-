@@ -39,7 +39,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v7
         with:
-          name: OpenTune-debug-apk
+          name: NovaMusic-debug-apk
           path: app/build/outputs/apk/universal/debug/*.apk
           if-no-files-found: error
           retention-days: 30

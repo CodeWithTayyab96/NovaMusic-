@@ -56,6 +56,7 @@ import com.my.kizzy.rpc.KizzyRPC
 import timber.log.Timber
 import kotlinx.coroutines.*
 import com.novamusic.app.utils.ArtworkStorage
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 enum class ActivitySource { ARTIST, ALBUM, SONG, APP }
 
@@ -66,8 +67,8 @@ fun DiscordSettings(
     scrollBehavior: TopAppBarScrollBehavior,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
-    val song by playerConnection.currentSong.collectAsState(null)
-    val playbackState by playerConnection.playbackState.collectAsState()
+    val song by playerConnection.currentSong.collectAsStateWithLifecycle(null)
+    val playbackState by playerConnection.playbackState.collectAsStateWithLifecycle()
     var position by rememberSaveable(playbackState) {
         mutableLongStateOf(playerConnection.player.currentPosition)
     }
@@ -479,7 +480,7 @@ if (intervalSelection == "Custom") {
                     }
                 }
             },
-            label = { Text("Value") },
+            label = { Text(stringResource(R.string.value)) },
             modifier = Modifier.weight(1f).padding(end = 8.dp),
             singleLine = true
         )
@@ -495,7 +496,7 @@ if (intervalSelection == "Custom") {
                 },
                 onValueChange = {},
                 readOnly = true,
-                label = { Text("Unit") },
+                label = { Text(stringResource(R.string.unit)) },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = unitExpanded) },
                 modifier = Modifier
                     .menuAnchor()
@@ -893,7 +894,7 @@ fun EditablePreference(
         description = description ?: if (value.isEmpty()) defaultValue else value,
         icon = { Icon(painterResource(iconRes), null) },
         trailingContent = {
-            TextButton(onClick = { showDialog = true }) { Text("Edit") }
+            TextButton(onClick = { showDialog = true }) { Text(stringResource(R.string.edit)) }
         }
     )
     if (showDialog) {
@@ -904,12 +905,12 @@ fun EditablePreference(
                 TextButton(onClick = {
                     onValueChange(if (text.isBlank()) "" else text)
                     showDialog = false
-                }) { Text("Save") }
+                }) { Text(stringResource(R.string.save)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showDialog = false }) { Text(stringResource(R.string.cancel)) }
             },
-            title = { Text("Edit $title") },
+            title = { Text(stringResource(R.string.edit_title, title)) },
             text = {
                 TextField(
                     value = text,

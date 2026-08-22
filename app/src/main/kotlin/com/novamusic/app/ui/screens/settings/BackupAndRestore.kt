@@ -87,7 +87,7 @@ import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -179,14 +179,14 @@ fun BackupAndRestore(
     var progressPercentage by rememberSaveable { mutableIntStateOf(0) }
     var showSpotifyLogin by rememberSaveable { mutableStateOf(false) }
 
-    val spotifyState by spotifyAccountViewModel.uiState.collectAsState()
+    val spotifyState by spotifyAccountViewModel.uiState.collectAsStateWithLifecycle()
     val (showSpotifyPlaylists, onShowSpotifyPlaylistsChange) = rememberPreference(
         ShowSpotifyPlaylistsKey,
         false
     )
 
-    val backupRestoreProgress by viewModel.backupRestoreProgress.collectAsState()
-    val cloudState by viewModel.cloudUploadState.collectAsState()
+    val backupRestoreProgress by viewModel.backupRestoreProgress.collectAsStateWithLifecycle()
+    val cloudState by viewModel.cloudUploadState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val clipboardManager = LocalClipboardManager.current

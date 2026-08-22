@@ -23,7 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -62,11 +62,11 @@ fun PlaylistSuggestionsSection(
     val database = LocalDatabase.current
     val coroutineScope = rememberCoroutineScope()
     val playerConnection = LocalPlayerConnection.current
-    val isPlaying by playerConnection?.isPlaying?.collectAsState() ?: androidx.compose.runtime.mutableStateOf(false)
-    val mediaMetadata by playerConnection?.mediaMetadata?.collectAsState() ?: androidx.compose.runtime.mutableStateOf(null)
+    val isPlaying by playerConnection?.isPlaying?.collectAsStateWithLifecycle() ?: androidx.compose.runtime.mutableStateOf(false)
+    val mediaMetadata by playerConnection?.mediaMetadata?.collectAsStateWithLifecycle() ?: androidx.compose.runtime.mutableStateOf(null)
     
-    val playlistSuggestions by viewModel.playlistSuggestions.collectAsState()
-    val isLoading by viewModel.isLoadingSuggestions.collectAsState()
+    val playlistSuggestions by viewModel.playlistSuggestions.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoadingSuggestions.collectAsStateWithLifecycle()
     
     // State for duplicate check dialog
     var showDuplicateDialog by remember { mutableStateOf(false) }

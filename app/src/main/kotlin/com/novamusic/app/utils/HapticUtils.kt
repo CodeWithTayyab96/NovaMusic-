@@ -13,6 +13,8 @@ import android.view.View
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
+import com.novamusic.app.R
 
 enum class HapticType {
     Click,
@@ -178,7 +180,7 @@ fun rememberHaptic(
  *     haptic.click()
  *     saveData()
  * }) {
- *     Text("Guardar")
+ *     Text(stringResource(R.string.save))
  * }
  * ```
  *
@@ -225,7 +227,7 @@ fun rememberHaptic(
  *         isEnabled = it
  *     }
  * ) {
- *     Text("Activar")
+ *     Text(stringResource(R.string.enable))
  * }
  * ```
  *
@@ -255,7 +257,7 @@ fun rememberHaptic(
  *         navigateToDetail()
  *     }
  * ) {
- *     Text("Ver detalle")
+ *     Text(stringResource(R.string.view_details))
  * }
  * ```
  *

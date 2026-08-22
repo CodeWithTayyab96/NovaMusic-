@@ -34,6 +34,7 @@ import com.novamusic.app.playback.LocalDownloadState
 import com.novamusic.app.ui.component.EmptyPlaceholder
 import com.novamusic.app.viewmodels.DownloadItem
 import com.novamusic.app.viewmodels.DownloadQueueViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,7 +42,7 @@ fun DownloadQueueScreen(
     navController: NavController,
     viewModel: DownloadQueueViewModel = hiltViewModel(),
 ) {
-    val downloads by viewModel.downloads.collectAsState()
+    val downloads by viewModel.downloads.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {

@@ -51,7 +51,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -173,7 +173,7 @@ fun LyricsV2(
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
 
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
 
     // ── Preferences ──
     val (lyricsClick) = rememberPreference(LyricsClickKey, defaultValue = true)
@@ -213,7 +213,7 @@ fun LyricsV2(
 
     var showShareDialog by remember { mutableStateOf(false) }
     // ── Lyrics data ──
-    val currentLyrics by playerConnection.currentLyrics.collectAsState(initial = null)
+    val currentLyrics by playerConnection.currentLyrics.collectAsStateWithLifecycle(initialValue = null)
     val lyrics = currentLyrics?.lyrics
 
     // ── Parse lyrics into entries ──
@@ -618,7 +618,7 @@ fun LyricsV2(
                     }
 
                     // ── Romanization ──
-                    val romanizedText by item.romanizedTextFlow.collectAsState()
+                    val romanizedText by item.romanizedTextFlow.collectAsStateWithLifecycle()
                     if (romanizedText != null) {
                         Text(
                             text = romanizedText!!,

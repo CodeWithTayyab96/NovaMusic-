@@ -352,7 +352,7 @@ fun AppearanceSettings(
         )
 
         SwitchPreference(
-            title = { Text("Haptic feedback") },
+            title = { Text(stringResource(R.string.haptic_feedback)) },
             icon = { Icon(painterResource(R.drawable.haptic), null) },
             checked = hapticEnabled,
             onCheckedChange = onHapticEnabledChange,
@@ -514,7 +514,7 @@ fun AppearanceSettings(
         )
 
         ListPreference(
-            title = { Text("Canvas source") },
+            title = { Text(stringResource(R.string.canvas_source)) },
             icon = { Icon(painterResource(R.drawable.motion_photos_on), null) },
             selectedValue = canvasSource,
             values = CanvasSource.entries,
@@ -654,7 +654,7 @@ fun AppearanceSettings(
         )
 
         SwitchPreference(
-            title = { Text("Lyrics V2 (Experimental)") },
+            title = { Text(stringResource(R.string.lyrics_v2_experimental)) },
             description = "Use the new fluid word-synced lyrics engine",
             icon = { Icon(painterResource(R.drawable.lyrics), null) },
             checked = useLyricsV2,
@@ -894,14 +894,14 @@ fun AppearanceSettings(
 
 
         PreferenceEntry(
-            title = { Text("Always On Display") },
+            title = { Text(stringResource(R.string.always_on_display)) },
             description = "Estilos, formas y opciones de personalización",
             icon = { Icon(painterResource(R.drawable.dark_mode), null) },
             onClick = { navController.navigate("settings/appearance/always_on_display") }
         )
 
         PreferenceEntry(
-            title = { Text("Widget Settings") },
+            title = { Text(stringResource(R.string.widget_settings)) },
             description = "Personaliza la apariencia del widget",
             icon = { Icon(painterResource(R.drawable.buttons), null) },
             onClick = { navController.navigate("settings/widget") }

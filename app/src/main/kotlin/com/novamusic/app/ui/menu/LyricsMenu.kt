@@ -44,7 +44,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -116,7 +116,7 @@ fun LyricsMenu(
     var showSearchResultDialog by rememberSaveable { mutableStateOf(false) }
     var toolbarExpanded by rememberSaveable { mutableStateOf(true) }
     val coroutineScope = rememberCoroutineScope()
-    val isNetworkAvailable by viewModel.isNetworkAvailable.collectAsState()
+    val isNetworkAvailable by viewModel.isNetworkAvailable.collectAsStateWithLifecycle()
 
     if (showEditDialog) {
         TextFieldDialog(
@@ -258,8 +258,8 @@ fun LyricsMenu(
     }
 
     if (showSearchResultDialog) {
-        val results by viewModel.results.collectAsState()
-        val isLoading by viewModel.isLoading.collectAsState()
+        val results by viewModel.results.collectAsStateWithLifecycle()
+        val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
         var expandedItemIndex by rememberSaveable { mutableIntStateOf(-1) }
 
         ListDialog(
@@ -346,7 +346,7 @@ fun LyricsMenu(
                                         )
                                     },
                                     label = {
-                                        Text("Synced")
+                                        Text(stringResource(R.string.synced))
                                     }
                                 )
                             }

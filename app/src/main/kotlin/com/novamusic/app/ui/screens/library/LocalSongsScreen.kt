@@ -60,7 +60,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -117,8 +117,8 @@ fun LocalSongsScreen(
     val menuState = LocalMenuState.current
     val haptic = LocalHapticFeedback.current
     val playerConnection = LocalPlayerConnection.current ?: return
-    val isPlaying by playerConnection.isPlaying.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    val isPlaying by playerConnection.isPlaying.collectAsStateWithLifecycle()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
 
     var selectedFolders by rememberPreference(SelectedLocalFoldersKey, emptySet())
@@ -154,7 +154,7 @@ fun LocalSongsScreen(
         if (hasPermission) scan()
     }
 
-    val allSongs by database.localSongs().collectAsState(initial = emptyList())
+    val allSongs by database.localSongs().collectAsStateWithLifecycle(initialValue = emptyList())
 
     val availableFolders by remember(allSongs) {
         derivedStateOf {

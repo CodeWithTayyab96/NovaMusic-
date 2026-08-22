@@ -77,6 +77,7 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Design tokens
@@ -201,14 +202,14 @@ fun YearInMusicScreen(
     val coroutineScope    = rememberCoroutineScope()
     val view              = LocalView.current
 
-    val availableYears      by viewModel.availableYears.collectAsState()
-    val selectedYear        by viewModel.selectedYear.collectAsState()
-    val topSongsStats       by viewModel.topSongsStats.collectAsState()
-    val topSongs            by viewModel.topSongs.collectAsState()
-    val topArtists          by viewModel.topArtists.collectAsState()
-    val topAlbums           by viewModel.topAlbums.collectAsState()
-    val totalListeningTime  by viewModel.totalListeningTime.collectAsState()
-    val totalSongsPlayed    by viewModel.totalSongsPlayed.collectAsState()
+    val availableYears      by viewModel.availableYears.collectAsStateWithLifecycle()
+    val selectedYear        by viewModel.selectedYear.collectAsStateWithLifecycle()
+    val topSongsStats       by viewModel.topSongsStats.collectAsStateWithLifecycle()
+    val topSongs            by viewModel.topSongs.collectAsStateWithLifecycle()
+    val topArtists          by viewModel.topArtists.collectAsStateWithLifecycle()
+    val topAlbums           by viewModel.topAlbums.collectAsStateWithLifecycle()
+    val totalListeningTime  by viewModel.totalListeningTime.collectAsStateWithLifecycle()
+    val totalSongsPlayed    by viewModel.totalSongsPlayed.collectAsStateWithLifecycle()
 
     var isGeneratingImage   by remember { mutableStateOf(false) }
     var isShareCaptureMode  by remember { mutableStateOf(false) }

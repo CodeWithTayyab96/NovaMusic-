@@ -123,7 +123,7 @@ import kotlin.math.min
 
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.novamusic.app.viewmodels.HomeViewModel
@@ -1062,8 +1062,8 @@ fun LazyListScope.AccountPlaylistsContainer(
     scope: CoroutineScope
 ) {
     item {
-        val accountPlaylists by viewModel.accountPlaylists.collectAsState()
-        val allItemsMetadata by viewModel.allItemsMetadata.collectAsState()
+        val accountPlaylists by viewModel.accountPlaylists.collectAsStateWithLifecycle()
+        val allItemsMetadata by viewModel.allItemsMetadata.collectAsStateWithLifecycle()
         
         // Check if list is not null and not empty
         val currentPlaylists = accountPlaylists
@@ -1105,8 +1105,8 @@ fun LazyListScope.SimilarRecommendationsContainer(
     scope: CoroutineScope
 ) {
      item {
-        val similarRecommendations by viewModel.similarRecommendations.collectAsState()
-        val allItemsMetadata by viewModel.allItemsMetadata.collectAsState()
+        val similarRecommendations by viewModel.similarRecommendations.collectAsStateWithLifecycle()
+        val allItemsMetadata by viewModel.allItemsMetadata.collectAsStateWithLifecycle()
         
         Column {
             similarRecommendations?.forEach { recommendation ->

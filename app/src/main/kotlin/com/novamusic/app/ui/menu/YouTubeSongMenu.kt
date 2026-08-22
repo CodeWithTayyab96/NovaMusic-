@@ -36,7 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ListItem
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -99,9 +99,9 @@ fun YouTubeSongMenu(
     val context = LocalContext.current
     val database = LocalDatabase.current
     val playerConnection = LocalPlayerConnection.current ?: return
-    val librarySong by database.song(song.id).collectAsState(initial = null)
+    val librarySong by database.song(song.id).collectAsStateWithLifecycle(initialValue = null)
     val downloader = LocalFileDownloader.current
-    val downloadStates by downloader.progress.collectAsState()
+    val downloadStates by downloader.progress.collectAsStateWithLifecycle()
     val isDownloaded = librarySong?.song?.isDownloadedByApp() == true
     val isDownloading =
         downloadStates[song.id]?.state == LocalDownloadState.State.QUEUED ||

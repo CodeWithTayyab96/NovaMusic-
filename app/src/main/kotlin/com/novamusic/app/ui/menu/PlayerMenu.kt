@@ -61,7 +61,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.ListItem
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -144,15 +144,15 @@ fun ColumnScope.PlayerMenu(
     val context = LocalContext.current
     val database = LocalDatabase.current
     val playerConnection = LocalPlayerConnection.current ?: return
-    val playerVolume = playerConnection.service.playerVolume.collectAsState()
+    val playerVolume = playerConnection.service.playerVolume.collectAsStateWithLifecycle()
     val activityResultLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { }
-    val librarySong by database.song(mediaMetadata.id).collectAsState(initial = null)
+    val librarySong by database.song(mediaMetadata.id).collectAsStateWithLifecycle(initialValue = null)
     val isLocalSong = librarySong?.song?.isLocal == true
     val coroutineScope = rememberCoroutineScope()
 
     val downloader = LocalFileDownloader.current
-    val downloadStates by downloader.progress.collectAsState()
+    val downloadStates by downloader.progress.collectAsStateWithLifecycle()
     val isDownloaded = librarySong?.song?.isDownloadedByApp() == true
     val isDownloading =
         downloadStates[mediaMetadata.id]?.state == LocalDownloadState.State.QUEUED ||
@@ -695,7 +695,7 @@ fun ColumnScope.PlayerMenu(
                             headlineContent = { Text(text = stringResource(R.string.tempo_and_pitch)) },
                             leadingContent = { Icon(painter = painterResource(R.drawable.speed), contentDescription = null) },
                             supportingContent = {
-                                val playbackParameters by playerConnection.playbackParameters.collectAsState()
+                                val playbackParameters by playerConnection.playbackParameters.collectAsStateWithLifecycle()
                                 Text(
                                     text = "x${formatMultiplier(playbackParameters.speed)} • x${formatMultiplier(playbackParameters.pitch)}",
                                     maxLines = 1,
@@ -1074,7 +1074,7 @@ private fun multiplierToSlider(multiplier: Float): Float {
 fun EqualizerDialog(onDismiss: () -> Unit, openSystemEqualizer: () -> Unit) {
     val context = LocalContext.current
     val playerConnection = LocalPlayerConnection.current ?: return
-    val eqCapabilities by playerConnection.service.eqCapabilities.collectAsState()
+    val eqCapabilities by playerConnection.service.eqCapabilities.collectAsStateWithLifecycle()
 
     val (eqEnabled, setEqEnabled) = rememberPreference(EqualizerEnabledKey, defaultValue = false)
     val (selectedProfileId, setSelectedProfileId) = rememberPreference(EqualizerSelectedProfileIdKey, defaultValue = "flat")

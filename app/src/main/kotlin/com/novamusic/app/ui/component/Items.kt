@@ -57,7 +57,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -792,7 +792,7 @@ fun SongListItem(
             }
             if (showDownloadIcon) {
                 val downloader = LocalFileDownloader.current
-                val localProgress by downloader.progress.collectAsState()
+                val localProgress by downloader.progress.collectAsStateWithLifecycle()
                 Icon.Download(
                     downloadedBadgeState(
                         isDownloadedByApp = song.song.isDownloadedByApp(),
@@ -872,7 +872,7 @@ fun SongGridItem(
             }
             if (showDownloadIcon) {
                 val downloader = LocalFileDownloader.current
-                val localProgress by downloader.progress.collectAsState()
+                val localProgress by downloader.progress.collectAsStateWithLifecycle()
                 Icon.Download(
                     downloadedBadgeState(
                         isDownloadedByApp = song.song.isDownloadedByApp(),
@@ -1487,8 +1487,8 @@ fun YouTubeListItem(
             if (item is SongItem) Icon.Download(metadata.downloadState)
         } else {
             val database = LocalDatabase.current
-            val song by database.song(item.id).collectAsState(initial = null)
-            val album by database.album(item.id).collectAsState(initial = null)
+            val song by database.song(item.id).collectAsStateWithLifecycle(initialValue = null)
+            val album by database.album(item.id).collectAsStateWithLifecycle(initialValue = null)
 
             if ((item is SongItem && song?.song?.liked == true) ||
                 (item is AlbumItem && album?.album?.bookmarkedAt != null)
@@ -1501,7 +1501,7 @@ fun YouTubeListItem(
             }
             if (item is SongItem) {
                 val downloader = LocalFileDownloader.current
-                val localProgress by downloader.progress.collectAsState()
+                val localProgress by downloader.progress.collectAsStateWithLifecycle()
                 Icon.Download(
                     downloadedBadgeState(
                         isDownloadedByApp = song?.song?.isDownloadedByApp() == true,
@@ -1571,8 +1571,8 @@ fun YouTubeGridItem(
             if (item is SongItem) Icon.Download(metadata.downloadState)
         } else {
             val database = LocalDatabase.current
-            val song by database.song(item.id).collectAsState(initial = null)
-            val album by database.album(item.id).collectAsState(initial = null)
+            val song by database.song(item.id).collectAsStateWithLifecycle(initialValue = null)
+            val album by database.album(item.id).collectAsStateWithLifecycle(initialValue = null)
 
             if (item is SongItem && song?.song?.liked == true ||
                 item is AlbumItem && album?.album?.bookmarkedAt != null
@@ -1583,7 +1583,7 @@ fun YouTubeGridItem(
             if (item is SongItem && song?.song?.inLibrary != null) Icon.Library()
             if (item is SongItem) {
                 val downloader = LocalFileDownloader.current
-                val localProgress by downloader.progress.collectAsState()
+                val localProgress by downloader.progress.collectAsStateWithLifecycle()
                 Icon.Download(
                     downloadedBadgeState(
                         isDownloadedByApp = song?.song?.isDownloadedByApp() == true,

@@ -1,9 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
-import java.io.ByteArrayOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
-import java.util.regex.Pattern
 
 plugins {
     alias(libs.plugins.android.application)
@@ -14,57 +10,35 @@ plugins {
 }
 
 fun fetchGitCommitHash(): String {
-    // Primero intenta obtener del repositorio local
-    try {
-        val rootDir = rootProject.projectDir
-        val process = ProcessBuilder("git", "rev-parse", "--short", "HEAD")
-            .directory(rootDir)
-            .redirectErrorStream(true)
-            .start()
-        val output = process.inputStream.bufferedReader().readText().trim()
-        process.waitFor()
-        if (output.isNotEmpty() && output != "unknown" && !output.contains("fatal")) {
-            println("Git commit (local): $output")
-            return output
-        }
-    } catch (e: Exception) {
-        println("Error reading local git commit: ${e.message}")
-    }
-
-    // Fallback: Obtener del repositorio remoto de GitHub sin dependencias externas
+    // Read the commit hash directly from the local .git directory.
+    // No subprocesses and no network access: spawning external processes at
+    // configuration time breaks the Gradle configuration cache, and the old
+    // GitHub API fallback added latency + a hard dependency on the network.
+    // Override with the GIT_COMMIT env var (e.g. in CI) when needed.
     return try {
-        println("Fetching latest commit from GitHub API...")
-        val url = URL("https://api.github.com/repos/CodeWithTayyab96/NovaMusic-/commits/main")
-        val connection = url.openConnection() as HttpURLConnection
-        connection.requestMethod = "GET"
-        connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
-        connection.connectTimeout = 5000
-        connection.readTimeout = 5000
-
-        val responseCode = connection.responseCode
-        if (responseCode == HttpURLConnection.HTTP_OK) {
-            val response = connection.inputStream.bufferedReader().use { it.readText() }
-
-            // Extraer el SHA del JSON manualmente con regex
-            val shaPattern = Pattern.compile("\"sha\":\"([a-f0-9]{40})\"")
-            val matcher = shaPattern.matcher(response)
-
-            if (matcher.find()) {
-                val fullSha = matcher.group(1)
-                val shortSha = fullSha.take(7)
-                println("Git commit (remote): $shortSha")
-                shortSha
+        val gitDir = rootProject.file(".git")
+        if (!gitDir.isDirectory) return System.getenv("GIT_COMMIT") ?: "unknown"
+        val head = gitDir.resolve("HEAD").readText().trim()
+        val sha = if (head.startsWith("ref: ")) {
+            val refPath = head.removePrefix("ref: ").trim()
+            val refFile = gitDir.resolve(refPath)
+            if (refFile.exists()) {
+                refFile.readText().trim()
             } else {
-                println("Could not find SHA in GitHub response")
-                "unknown"
+                val packed = gitDir.resolve("packed-refs")
+                if (packed.exists()) {
+                    packed.readLines()
+                        .firstOrNull { it.endsWith(" $refPath") }
+                        ?.substringBefore(' ')
+                        ?: "unknown"
+                } else "unknown"
             }
         } else {
-            println("GitHub API returned code: $responseCode")
-            "unknown"
+            head // detached HEAD: the full sha is in HEAD itself
         }
+        sha.take(7).ifEmpty { "unknown" }
     } catch (e: Exception) {
-        println("Error fetching remote git commit: ${e.message}")
-        "unknown"
+        System.getenv("GIT_COMMIT") ?: "unknown"
     }
 }
 
@@ -169,7 +143,7 @@ android {
     }
 
     compileOptions {
-        isCoreLibraryDesugaringEnabled = false
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
     }
@@ -242,8 +216,6 @@ dependencies {
     implementation(libs.kashif.mehmood.km.backdrop)
     implementation(libs.dev.haze)
     implementation(libs.compose.markdown)
-    compileOnly("androidx.compose.ui:ui-tooling-preview:${libs.versions.compose.get()}")
-    debugImplementation("androidx.compose.ui:ui-tooling-preview:${libs.versions.compose.get()}")
     debugImplementation(libs.compose.ui.tooling)
     implementation(libs.compose.animation)
     implementation(libs.compose.reorderable)
@@ -253,7 +225,7 @@ dependencies {
 
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.json)
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+    implementation(libs.kotlinx.serialization.json)
 
     implementation(libs.material3)
     implementation(libs.palette)
@@ -293,7 +265,7 @@ dependencies {
     implementation(project(":simpmusic"))
     implementation(project(":canvas"))
     implementation(project(":shazamkit"))
-    implementation("com.github.Kyant0:m3color:2025.4")
+    implementation(libs.m3color)
     implementation(libs.compose.cloudy)
 
     implementation(project(":jossredconnect"))
@@ -314,8 +286,9 @@ dependencies {
 
     implementation(libs.timber)
     testImplementation(libs.junit)
-    implementation("com.github.therealbush:translator:1.1.1")
-    implementation("androidx.lifecycle:lifecycle-process:2.10.0")
+    implementation(libs.translator)
+    implementation(libs.lifecycle.process)
+    implementation(libs.lifecycle.runtime.compose)
     implementation("androidx.compose.material3.adaptive:adaptive:1.2.0")
 }
 
@@ -327,7 +300,6 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
             "-opt-in=kotlin.RequiresOptIn",
             "-Xcontext-parameters"
         )
-        suppressWarnings.set(true)
     }
 }
 

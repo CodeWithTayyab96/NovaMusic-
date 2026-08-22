@@ -58,6 +58,8 @@ import com.novamusic.app.ui.theme.OpenTuneTheme
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.ui.res.stringResource
+import com.novamusic.app.R
 
 class DebugActivity : ComponentActivity() {
     companion object {
@@ -306,7 +308,7 @@ private fun CrashReportScaffold(
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 ) {
-                    Text("Restart")
+                    Text(stringResource(R.string.restart))
                 }
                 Button(
                     onClick = onClose,
@@ -314,7 +316,7 @@ private fun CrashReportScaffold(
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                 ) {
-                    Text("Close")
+                    Text(stringResource(R.string.close))
                 }
             }
 

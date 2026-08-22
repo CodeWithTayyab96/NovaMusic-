@@ -62,7 +62,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -125,6 +125,7 @@ import com.novamusic.app.ui.utils.highRes
 import com.novamusic.app.utils.makeTimeString
 import com.skydoves.cloudy.cloudy
 import timber.log.Timber
+import androidx.compose.ui.res.stringResource
 
 @Composable
 fun PlayerTitleSection(
@@ -161,9 +162,9 @@ fun PlayerTitleSection(
                             }
                         },
                         onLongClick = {
-                            val clip = ClipData.newPlainText("Copied Title", title)
+                            val clip = ClipData.newPlainText(context.getString(R.string.copied_title), title)
                             clipboardManager.setPrimaryClip(clip)
-                            Toast.makeText(context, "Copied Title", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.copied_title), Toast.LENGTH_SHORT).show()
                         }
                     ),
         )
@@ -230,9 +231,9 @@ fun PlayerTitleSection(
                         }
                     },
                     onLongClick = {
-                        val clip = ClipData.newPlainText("Copied Artist", annotatedString)
+                        val clip = ClipData.newPlainText(context.getString(R.string.copied_artist), annotatedString)
                         clipboardManager.setPrimaryClip(clip)
-                        Toast.makeText(context, "Copied Artist", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.copied_artist), Toast.LENGTH_SHORT).show()
                     }
                 )
         )
@@ -952,7 +953,7 @@ fun PlayerPlaybackControls(
     playerConnection: PlayerConnection,
     currentSongLiked: Boolean
 ) {
-    val shuffleModeEnabled by playerConnection.shuffleModeEnabled.collectAsState()
+    val shuffleModeEnabled by playerConnection.shuffleModeEnabled.collectAsStateWithLifecycle()
 
     when (playerDesignStyle) {
         PlayerDesignStyle.V2 -> {
@@ -2165,7 +2166,7 @@ fun PlayerControlsContent(
     currentFormat: FormatEntity? = null,
     onResetTimer: () -> Unit = {},
 ) {
-    val currentSong by playerConnection.currentSong.collectAsState(initial = null)
+    val currentSong by playerConnection.currentSong.collectAsStateWithLifecycle(initialValue = null)
     val currentSongLiked = currentSong?.song?.liked == true
 
     val playPauseRoundness by animateDpAsState(
@@ -2925,9 +2926,9 @@ fun V8PlayerControlsContent(
     playerVolume: Float,
     onVolumeChange: (Float) -> Unit,
 ) {
-    val currentSong by playerConnection.currentSong.collectAsState(initial = null)
+    val currentSong by playerConnection.currentSong.collectAsStateWithLifecycle(initialValue = null)
     val currentSongLiked = currentSong?.song?.liked == true
-    val shuffleModeEnabled by playerConnection.shuffleModeEnabled.collectAsState()
+    val shuffleModeEnabled by playerConnection.shuffleModeEnabled.collectAsStateWithLifecycle()
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,

@@ -34,7 +34,7 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:usesCleartextTraffic="true"
-        android:supportsRtl="false"
+        android:supportsRtl="true"
         android:theme="@style/Theme.NovaMusic"
         tools:targetApi="tiramisu">
         <uses-library
@@ -228,7 +228,7 @@
 
         <activity
             android:name=".DebugActivity"
-            android:exported="true"
+            android:exported="false"
             android:process=":crash"
             android:theme="@style/Theme.NovaMusic">
         </activity>

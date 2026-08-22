@@ -58,7 +58,7 @@ import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.HorizontalUncontainedCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -108,13 +108,13 @@ fun NewReleaseScreen(
     val menuState = LocalMenuState.current
     val haptic = LocalHapticFeedback.current
     val playerConnection = LocalPlayerConnection.current ?: return
-    val isPlaying by playerConnection.isPlaying.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    val isPlaying by playerConnection.isPlaying.collectAsStateWithLifecycle()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
 
-    val uiState by viewModel.uiState.collectAsState()
-    val albumsList by viewModel.albums.collectAsState(initial = emptyList())
-    val singlesList by viewModel.singles.collectAsState(initial = emptyList())
-    val epsList by viewModel.eps.collectAsState(initial = emptyList())
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val albumsList by viewModel.albums.collectAsStateWithLifecycle(initialValue = emptyList())
+    val singlesList by viewModel.singles.collectAsStateWithLifecycle(initialValue = emptyList())
+    val epsList by viewModel.eps.collectAsStateWithLifecycle(initialValue = emptyList())
 
     val coroutineScope = rememberCoroutineScope()
     val systemBarsTopPadding =

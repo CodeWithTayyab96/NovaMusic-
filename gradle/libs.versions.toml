@@ -1,6 +1,5 @@
 [versions]
 agp = "9.1.0"
-annotation = "1.9.1"
 json = "20250517"
 kotlin = "2.3.20"
 compose = "1.11.0-rc01"
@@ -32,29 +31,28 @@ apacheLang3 = "3.20.0"
 brotli = "0.1.2"
 desugaring = "2.1.5"
 junit = "4.13.2"
-turbine = "1.2.1"
 timber = "5.0.1"
 kuromojiIpadic = "0.9.0"
-anyascii = "0.3.3"
 extractor = "v0.25.2"
 rhino = "1.9.1"
 multiplatformMarkdown = "0.40.2"
-haze = "1.7.2"
-hazeMaterials = "1.7.2"
 media = "1.6.0"
+# NOTE: ui-graphics / ui-tooling-preview intentionally track a newer alpha than
+# the rest of the Compose BOM (the alpha carries a fix the app relies on).
+# Aligning them to ${compose} requires a network-enabled build to verify.
 uiGraphics = "1.12.0-alpha01"
 uiToolingPreview = "1.12.0-alpha01"
-androidliquidglass = "1.0.0"
 backdrop = "1.0.6"
-liquidGlass = "1.0.6"
 backdropVersion = "0.0.1-alpha02"
 hazeVersion = "1.3.1"
 okhttp = "5.3.2"
 glance = "1.2.0-rc01"
 composeMarkdown = "0.7.2"
+kotlinxSerializationJson = "1.8.0"
+m3color = "2025.4"
+translator = "1.1.1"
 
 [libraries]
-annotation = { module = "androidx.annotation:annotation", version.ref = "annotation" }
 guava = { module = "com.google.guava:guava", version.ref = "guava" }
 coroutines-guava = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-guava", version.ref = "coroutinesGuava" }
 concurrent-futures = { module = "androidx.concurrent:concurrent-futures-ktx", version.ref = "concurrentFutures" }
@@ -130,30 +128,29 @@ rhino = { module = "org.mozilla:rhino", version.ref = "rhino" }
 desugaring = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugaring" }
 
 junit = { module = "junit:junit", version.ref = "junit" }
-turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
 
 newpipe-extractor = { module = "com.github.TeamNewPipe:NewPipeExtractor", version.ref = "extractor" }
 
 kuromoji-ipadic = { module = "com.atilika.kuromoji:kuromoji-ipadic", version.ref = "kuromojiIpadic" }
-anyascii = { module = "com.anyascii:anyascii", version.ref = "anyascii" }
 
 multiplatform-markdown = { module = "com.mikepenz:multiplatform-markdown-renderer-m3", version.ref = "multiplatformMarkdown" }
-haze = { group = "dev.chrisbanes.haze", name = "haze", version.ref = "haze" }
-haze-materials = { group = "dev.chrisbanes.haze", name = "haze-materials", version.ref = "hazeMaterials" }
 media = { group = "androidx.media", name = "media", version.ref = "media" }
 ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics", version.ref = "uiGraphics" }
 ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview", version.ref = "uiToolingPreview" }
-androidliquidglass = { group = "com.github.Kyant0", name = "AndroidLiquidGlass", version.ref = "androidliquidglass" }
 backdrop = { group = "io.github.kyant0", name = "backdrop", version.ref = "backdrop" }
-liquid-glass = { group = "om.kyant", name = "liquid-glass", version.ref = "liquidGlass" }
 kashif-mehmood-km-backdrop = { group = "io.github.kashif-mehmood-km", name = "backdrop", version.ref = "backdropVersion" }
 dev-haze = { group = "dev.chrisbanes.haze", name = "haze", version.ref = "hazeVersion" }
 okhttp-dnsoverhttps = { group = "com.squareup.okhttp3", name = "okhttp-dnsoverhttps", version.ref = "okhttp" }
 compose-markdown = { group = "com.github.jeziellago", name = "compose-markdown", version.ref = "composeMarkdown" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
+
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
+m3color = { module = "com.github.Kyant0:m3color", version.ref = "m3color" }
+translator = { module = "com.github.therealbush:translator", version.ref = "translator" }
+lifecycle-process = { module = "androidx.lifecycle:lifecycle-process", version.ref = "lifecycle" }
 
 
 [plugins]

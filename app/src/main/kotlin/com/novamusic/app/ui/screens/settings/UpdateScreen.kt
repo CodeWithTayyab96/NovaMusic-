@@ -494,20 +494,20 @@ private fun UpdateCheckButton(
                     UpdateCheckState.Loading -> {
                         CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
                         Spacer(Modifier.width(8.dp))
-                        Text("Comprobando…")
+                        Text(stringResource(R.string.checking))
                     }
                     UpdateCheckState.UpToDate -> {
                         Icon(painterResource(R.drawable.done), null, Modifier.size(16.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Al día")
+                        Text(stringResource(R.string.up_to_date))
                     }
                     is UpdateCheckState.UpdateAvailable -> {
                         Icon(painterResource(R.drawable.update), null, Modifier.size(16.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Ver actualización (${s.info.versionName})")
+                        Text(stringResource(R.string.view_update, s.info.versionName))
                     }
                     is UpdateCheckState.Error -> {
-                        Text("Reintentar")
+                        Text(stringResource(R.string.retry))
                     }
                     else -> {
                         Icon(painterResource(R.drawable.update), null, Modifier.size(16.dp))
@@ -666,7 +666,7 @@ private fun UpdateDetailsBottomSheet(
                     ) {
                         Icon(painterResource(R.drawable.download), null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Actualizar ahora", fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.update_now), fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -688,10 +688,10 @@ private fun BuildChannelInfoDialog(
                 Text("NovaMusic provides stable builds distributed via GitHub Releases:", style = MaterialTheme.typography.bodyMedium)
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text("• Stable builds", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                    Text("Distributed via the official GitHub Releases of this repository.", style = MaterialTheme.typography.bodySmall)
-                    Text("These versions are tested and recommended for most users.", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.update_distribution_info), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.update_tested_info), style = MaterialTheme.typography.bodySmall)
                 }
-                Text("Updates are checked automatically and installed through the in-app updater.", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.update_automatic_info), style = MaterialTheme.typography.bodySmall)
             }
         },
         confirmButton = { TextButton(onClick = onConfirm) { Text(stringResource(android.R.string.ok)) } },

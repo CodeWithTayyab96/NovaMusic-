@@ -54,7 +54,7 @@ import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -103,7 +103,7 @@ fun PoTokenScreen(
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
-    val tokenState by viewModel.state.collectAsState()
+    val tokenState by viewModel.state.collectAsStateWithLifecycle()
     var showRegenerateSheet by remember { mutableStateOf(false) }
     val regenerateSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 

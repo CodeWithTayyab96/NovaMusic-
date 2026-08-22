@@ -36,7 +36,7 @@ private const val MIN_DURATION_MS = 30_000L
 
 /** Regex matching WhatsApp voice note filenames: AUD-YYYYMMDD-WAnnnn, PTT-*, voice-*. */
 private val WHATSAPP_VOICE_NOTE_PATTERN =
-    Regex("^(AUD|PTT|voice)-\d{8}-WA", RegexOption.IGNORE_CASE)
+    Regex("""^(AUD|PTT|voice)-\d{8}-WA""", RegexOption.IGNORE_CASE)
 
 /** Set of directory name fragments that indicate non-music audio (voice notes, messages,
  *  etc.).  Paths from MediaStore always use '/' separators, so these patterns use '/'.

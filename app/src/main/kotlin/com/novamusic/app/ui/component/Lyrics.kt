@@ -69,7 +69,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -444,8 +444,8 @@ fun Lyrics(
     val romanizeKoreanLyrics by rememberPreference(LyricsRomanizeKoreanKey, true)
     val scope = rememberCoroutineScope()
 
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
-    val lyricsEntity by playerConnection.currentLyrics.collectAsState(initial = null)
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
+    val lyricsEntity by playerConnection.currentLyrics.collectAsStateWithLifecycle(initialValue = null)
     val lyrics = remember(lyricsEntity) { lyricsEntity?.lyrics?.trim() }
 
 
@@ -1076,7 +1076,7 @@ fun Lyrics(
                                     val hasWordTimings = remember(item.words) { item.words?.isNotEmpty() == true }
                                     val romanizedText: String? =
                                         if (romanizeJapaneseLyrics || romanizeKoreanLyrics) {
-                                            val value by item.romanizedTextFlow.collectAsState()
+                                            val value by item.romanizedTextFlow.collectAsStateWithLifecycle()
                                             value
                                         } else {
                                             null
