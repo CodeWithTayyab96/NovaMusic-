@@ -38,29 +38,30 @@ private const val MIN_DURATION_MS = 30_000L
 private val WHATSAPP_VOICE_NOTE_PATTERN =
     Regex("^(AUD|PTT|voice)-\d{8}-WA", RegexOption.IGNORE_CASE)
 
-/** Set of directory names that indicate non-music audio (voice notes, messages, etc.). */
-private val NON_MUSIC_DIR_NAMES = setOf(
-    "WhatsApp\\Media\\WhatsApp Voice Notes",
-    "WhatsApp\\Media\\WhatsApp Audio",
-    ".Statuses",
-    "Telegram\\Telegram Audio",
-    "Telegram\\Telegram Voice",
-    "Telegram\\Telegram Documents",
-    "Signal\\Signal\\Audio",
-    "Android\\media\\com.whatsapp\\WhatsApp\\Media\\WhatsApp Voice Notes",
-    "Android\\media\\com.whatsapp\\WhatsApp\\Media\\WhatsApp Audio",
+/** Set of directory name fragments that indicate non-music audio (voice notes, messages,
+ *  etc.).  Paths from MediaStore always use '/' separators, so these patterns use '/'.
+ *  Matched case-insensitively against the full file path. */
+private val NON_MUSIC_DIR_PATHS = setOf(
+    "/WhatsApp/Media/WhatsApp Voice Notes",
+    "/WhatsApp/Media/WhatsApp Audio",
+    "/.Statuses",
+    "/Telegram/Telegram Audio",
+    "/Telegram/Telegram Voice",
+    "/Telegram/Documents",
+    "/Signal/Signal/Audio",
+    "/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Voice Notes",
+    "/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Audio",
 )
 
 /** Returns true when [filePath] looks like a non-music audio file (voice note, ringtone,
  *  notification sound, etc.) based on path patterns and filename conventions. */
-private fun isNonMusicAudioFile(filePath: String, title: String?): Boolean {
+private fun isNonMusicAudioFile(filePath: String, @Suppress("UNUSED_PARAMETER") title: String?): Boolean {
     // Check WhatsApp voice note filename pattern (e.g. AUD-20260706-WA0013)
-    val name = filePath.substringAfterLast(File.separator)
+    val name = filePath.substringAfterLast('/')
     if (WHATSAPP_VOICE_NOTE_PATTERN.containsMatchIn(name)) return true
 
     // Check for known non-music directories in the path
-    val normalizedPath = filePath.replace('/', File.separatorChar)
-    if (NON_MUSIC_DIR_NAMES.any { dir -> normalizedPath.contains(dir, ignoreCase = true) }) return true
+    if (NON_MUSIC_DIR_PATHS.any { dir -> filePath.contains(dir, ignoreCase = true) }) return true
 
     return false
 }
