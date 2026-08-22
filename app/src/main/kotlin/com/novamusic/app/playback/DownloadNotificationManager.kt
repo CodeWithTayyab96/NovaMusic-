@@ -192,12 +192,18 @@ object DownloadNotificationManager {
     }
 
     /** Shows "Download failed" for a terminal failure. */
-    fun showFailed(context: Context, title: String) {
+    fun showFailed(context: Context, title: String, reason: String? = null) {
+        val contentText = if (!reason.isNullOrBlank()) {
+            context.getString(R.string.download_failed_reason, reason)
+        } else {
+            context.getString(R.string.download_failed)
+        }
         val notification =
             NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.error)
                 .setContentTitle(title)
-                .setContentText(context.getString(R.string.download_failed))
+                .setContentText(contentText)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(contentText))
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setAutoCancel(true)
                 .setContentIntent(downloadQueueIntent(context))

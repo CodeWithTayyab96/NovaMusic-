@@ -26,6 +26,7 @@
     <string name="last_week">上周</string>
     <string name="most_played_artists">播放次数最多的艺人</string>
     <string name="most_played_albums">被播放最多的专辑</string>
+    <string name="most_played_badge">最多播放</string>
     <string name="search">搜索</string>
     <string name="search_yt_music">从YT Music中搜索…</string>
     <string name="search_library">从库中搜索…</string>

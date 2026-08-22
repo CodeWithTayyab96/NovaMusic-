@@ -38,6 +38,7 @@
     <string name="most_played_songs">Most played songs</string>
     <string name="most_played_artists">Most played artists</string>
     <string name="most_played_albums">Most played albums</string>
+    <string name="most_played_badge">Most played</string>
     <!-- Search -->
     <string name="search">Search</string>
     <string name="search_yt_music">Search YouTube Music…</string>
@@ -105,6 +106,8 @@
     <string name="action_cancel">Cancel</string>
     <string name="download_complete">Download complete</string>
     <string name="download_failed">Download failed</string>
+    <string name="download_failed_unavailable">Song unavailable from source</string>
+    <string name="download_failed_reason">Download failed: %1$s</string>
     <string name="downloads_channel_name">Downloads</string>
     <string name="downloads_channel_desc">Shows the progress of songs being saved to your device</string>
     <string name="download_progress_percent">%1$s — %2$d%%</string>

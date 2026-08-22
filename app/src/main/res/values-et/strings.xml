@@ -29,6 +29,7 @@
     <string name="most_played_songs">Kõige rohkem esitatud lood</string>
     <string name="most_played_artists">Kõige rohkem esitatud esinejad</string>
     <string name="most_played_albums">Kõige rohkem esitatud albumid</string>
+    <string name="most_played_badge">Kõige rohkem esitatud</string>
     <string name="search">Otsi</string>
     <string name="search_yt_music">Otsi YouTube Musicust…</string>
     <string name="search_library">Otsi muusikakogust…</string>

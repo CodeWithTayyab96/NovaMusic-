@@ -33,6 +33,7 @@
     <string name="most_played_songs">Paling sering diputar lagu</string>
     <string name="most_played_artists">Artis yang paling sering diputar</string>
     <string name="most_played_albums">Album yang paling sering diputar</string>
+    <string name="most_played_badge">Paling sering diputar</string>
     <!-- Search -->
     <string name="search">Penelusuran</string>
     <string name="search_yt_music">Telusuri YouTube Musik…</string>

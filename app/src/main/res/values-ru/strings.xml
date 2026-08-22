@@ -31,6 +31,7 @@
     <string name="most_played_songs">Самые прослушиваемые песни</string>
     <string name="most_played_artists">Самые прослушиваемые исполнители</string>
     <string name="most_played_albums">Самые прослушиваемые альбомы</string>
+    <string name="most_played_badge">Самые прослушиваемые</string>
     <string name="search">Поиск</string>
     <string name="search_yt_music">Поиск на YouTube Music…</string>
     <string name="search_library">Поиск в библиотеке…</string>

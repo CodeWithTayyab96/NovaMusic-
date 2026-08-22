@@ -33,6 +33,7 @@
     <string name="most_played_songs">الأغاني الأكثر استماعاً</string>
     <string name="most_played_artists">الفنانون الأكثر استماعاً</string>
     <string name="most_played_albums">الألبومات الأكثر استماعاً</string>
+    <string name="most_played_badge">الأكثر استماعاً</string>
     <string name="search">البحث</string>
     <string name="search_yt_music">البحث في YouTube Music…</string>
     <string name="search_library">ابحث في المكتبة…</string>

@@ -30,6 +30,7 @@
     <string name="most_played_songs">Músicas mais ouvidas</string>
     <string name="most_played_artists">Artistas mais ouvidos</string>
     <string name="most_played_albums">Álbuns mais ouvidos</string>
+    <string name="most_played_badge">Mais ouvidos</string>
     <string name="search">Pesquisar</string>
     <string name="search_yt_music">Pesquisar no YouTube Music…</string>
     <string name="search_library">Pesquisar na biblioteca…</string>

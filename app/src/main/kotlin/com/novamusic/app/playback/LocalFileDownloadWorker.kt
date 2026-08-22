@@ -10,6 +10,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
+import android.util.Log
 import com.novamusic.app.di.LocalFileDownloaderEntryPoint
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.CancellationException
@@ -69,11 +70,13 @@ class LocalFileDownloadWorker(
             DownloadNotificationManager.cancelSong(applicationContext, songId)
             throw e
         } catch (e: Exception) {
+            Log.e(TAG, "Download failed for $songId (attempt ${runAttemptCount + 1}/$MAX_RETRIES): ${e.message}", e)
             if (runAttemptCount < MAX_RETRIES) {
                 Result.retry()
             } else {
                 DownloadNotificationManager.cancelSong(applicationContext, songId)
-                DownloadNotificationManager.showFailed(applicationContext, title)
+                val reason = e.cause?.message?.take(120) ?: e.message?.take(120)
+                DownloadNotificationManager.showFailed(applicationContext, title, reason)
                 Result.failure()
             }
         }
@@ -120,6 +123,7 @@ class LocalFileDownloadWorker(
     }
 
     companion object {
+        private const val TAG = "LocalFileDownloadWorker"
         const val KEY_SONG_ID = "song_id"
         const val KEY_TITLE = "title"
         const val KEY_ARTIST = "artist"

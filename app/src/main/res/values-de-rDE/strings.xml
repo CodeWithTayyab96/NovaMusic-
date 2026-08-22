@@ -34,6 +34,7 @@
     <string name="most_played_songs">Die meisten gespielten Lieder</string>
     <string name="most_played_artists">Die meisten gespielten Künstler</string>
     <string name="most_played_albums">Die meisten gespielten Alben</string>
+    <string name="most_played_badge">Meistgespielt</string>
     <!-- Search -->
     <string name="search">Suchen</string>
     <string name="search_yt_music">Durchsuchen Sie YouTube Music…</string>

@@ -34,6 +34,7 @@
     <string name="most_played_songs">En çok çalınan şarkılar</string>
     <string name="most_played_artists">En çok oynanan sanatçılar</string>
     <string name="most_played_albums">En çok çalınan albümler</string>
+    <string name="most_played_badge">En çok çalınan</string>
     <!-- Search -->
     <string name="search">Ara</string>
     <string name="search_yt_music">YouTube Müzik\'te ara…</string>

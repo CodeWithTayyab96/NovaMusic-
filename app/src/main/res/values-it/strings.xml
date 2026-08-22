@@ -35,6 +35,7 @@
     <string name="most_played_songs">Canzoni più suonate</string>
     <string name="most_played_artists">Artisti più suonati</string>
     <string name="most_played_albums">Gli album più ascoltati</string>
+    <string name="most_played_badge">Più riprodotti</string>
     <!-- Search -->
     <string name="search">Cerca</string>
     <string name="search_yt_music">Cerca su YouTube Musica...</string>

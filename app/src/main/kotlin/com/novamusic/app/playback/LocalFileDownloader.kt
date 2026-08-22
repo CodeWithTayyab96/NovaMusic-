@@ -110,7 +110,27 @@ constructor(
         _progress.update { map -> map + (songId to queued) }
         onProgress?.invoke(queued)
         try {
-            val streamUrl = downloadUtil.resolveStreamUrl(songId)
+            val streamUrl = try {
+                downloadUtil.resolveStreamUrl(songId)
+            } catch (e: Exception) {
+                val reason = when {
+                    e.message?.contains("timed out", ignoreCase = true) == true ->
+                        "Network timeout — check your connection"
+                    e.message?.contains("403") == true ||
+                        e.message?.contains("Forbidden", ignoreCase = true) == true ->
+                        "Song unavailable from source (403 Forbidden)"
+                    e.message?.contains("404") == true ||
+                        e.message?.contains("Not Found", ignoreCase = true) == true ->
+                        "Song not found on source"
+                    e.message?.contains("not available", ignoreCase = true) == true ||
+                        e.message?.contains("unavailable", ignoreCase = true) == true ->
+                        "Song is not available in your region"
+                    else ->
+                        "Could not resolve stream URL"
+                }
+                Log.e(TAG, "Stream URL resolution failed for $songId: ${e.message}")
+                throw IOException("$reason (song: $safeTitle by $artist)", e)
+            }
             val downloading = LocalDownloadState(
                 songId = songId,
                 title = safeTitle,

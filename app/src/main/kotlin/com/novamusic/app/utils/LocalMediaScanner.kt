@@ -30,6 +30,41 @@ import java.time.ZoneId
 /** Stable id prefix for songs sourced from on-device MediaStore audio. */
 private const val LOCAL_SONG_ID_PREFIX = "LM"
 
+/** Minimum audio duration in milliseconds. Files shorter than this are almost certainly
+ *  voice notes, ringtones, or notification sounds rather than music. */
+private const val MIN_DURATION_MS = 30_000L
+
+/** Regex matching WhatsApp voice note filenames: AUD-YYYYMMDD-WAnnnn, PTT-*, voice-*. */
+private val WHATSAPP_VOICE_NOTE_PATTERN =
+    Regex("^(AUD|PTT|voice)-\d{8}-WA", RegexOption.IGNORE_CASE)
+
+/** Set of directory names that indicate non-music audio (voice notes, messages, etc.). */
+private val NON_MUSIC_DIR_NAMES = setOf(
+    "WhatsApp\\Media\\WhatsApp Voice Notes",
+    "WhatsApp\\Media\\WhatsApp Audio",
+    ".Statuses",
+    "Telegram\\Telegram Audio",
+    "Telegram\\Telegram Voice",
+    "Telegram\\Telegram Documents",
+    "Signal\\Signal\\Audio",
+    "Android\\media\\com.whatsapp\\WhatsApp\\Media\\WhatsApp Voice Notes",
+    "Android\\media\\com.whatsapp\\WhatsApp\\Media\\WhatsApp Audio",
+)
+
+/** Returns true when [filePath] looks like a non-music audio file (voice note, ringtone,
+ *  notification sound, etc.) based on path patterns and filename conventions. */
+private fun isNonMusicAudioFile(filePath: String, title: String?): Boolean {
+    // Check WhatsApp voice note filename pattern (e.g. AUD-20260706-WA0013)
+    val name = filePath.substringAfterLast(File.separator)
+    if (WHATSAPP_VOICE_NOTE_PATTERN.containsMatchIn(name)) return true
+
+    // Check for known non-music directories in the path
+    val normalizedPath = filePath.replace('/', File.separatorChar)
+    if (NON_MUSIC_DIR_NAMES.any { dir -> normalizedPath.contains(dir, ignoreCase = true) }) return true
+
+    return false
+}
+
 /** Legacy but still functional MediaStore album-art URI, keyed by album id. */
 private val ALBUM_ART_URI = Uri.parse("content://media/external/audio/albumart")
 
@@ -53,14 +88,21 @@ object LocalMediaScanner {
             MediaStore.Audio.Media.DATE_MODIFIED,
             MediaStore.Audio.Media.DATA, // Ruta del archivo
         )
-        val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+        // Combine IS_MUSIC flag with a minimum duration filter. IS_MUSIC is unreliable
+        // on some OEM ROMs (WhatsApp voice notes, Telegram voice messages, etc. can be
+        // flagged IS_MUSIC=1), so we also apply code-level path/pattern exclusions below.
+        val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND " +
+            "${MediaStore.Audio.Media.DURATION} > ?"
 
         var count = 0
+        // 30 seconds in milliseconds — below this, files are almost certainly voice notes,
+        // ringtones, or notification sounds, not music.
+        val selectionArgs = arrayOf(MIN_DURATION_MS.toString())
         context.contentResolver.query(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
             projection,
             selection,
-            null,
+            selectionArgs,
             null,
         )?.use { cursor ->
             val idCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
@@ -90,6 +132,13 @@ object LocalMediaScanner {
                 val durationMs = cursor.getLong(durationCol)
                 val dateModifiedSec = cursor.getLong(dateModifiedCol)
                 val filePath = cursor.getString(dataCol)
+
+                // Exclude WhatsApp/Telegram voice notes and similar non-music audio.
+                // The IS_MUSIC flag is unreliable on many OEM ROMs and these apps often
+                // set it on their voice notes. Filter by path pattern and filename.
+                if (!filePath.isNullOrBlank() && isNonMusicAudioFile(filePath, storeTitle)) {
+                    continue
+                }
 
                 // MediaStore's tag indexing misses/mislabels artists on plenty of real-world
                 // files (untagged rips, unusual encoders); fall back to reading ID3/Vorbis/etc

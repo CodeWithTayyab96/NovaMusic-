@@ -33,6 +33,7 @@
     <string name="most_played_songs">가장 많이 재생됨 노래</string>
     <string name="most_played_artists">가장 많이 재생된 아티스트</string>
     <string name="most_played_albums">가장 많이 재생된 앨범</string>
+    <string name="most_played_badge">가장 많이 재생됨</string>
     <!-- Search -->
     <string name="search">검색</string>
     <string name="search_yt_music">YouTube Music 검색…</string>
