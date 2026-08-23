@@ -13,6 +13,7 @@ import androidx.work.ForegroundInfo
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.novamusic.app.R
 import com.novamusic.app.di.LocalFileDownloaderEntryPoint
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.CancellationException
@@ -96,12 +97,30 @@ class LocalFileDownloadWorker(
                     // re-run the worker when constraints are satisfied again.
                     // Show a paused notification so the download doesn't silently
                     // vanish from the user's view.
-                    Timber.w("$TAG: Download $songId interrupted by system stop — paused until constraints re-met")
-                    downloader.markPaused(songId, title, artist, e.message)
-                    DownloadNotificationManager.postPaused(
-                        applicationContext, songId, title, artist,
-                        "Waiting for network",
-                    )
+                    Timber.w("$TAG: Download $songId interrupted by system stop — pausing until constraints re-met")
+                    val stopCount = downloader.markPaused(songId, title, artist, e.message)
+                    if (stopCount > MAX_SYSTEM_STOPS) {
+                        // Flaky/unresolvable network: after several pause/resume
+                        // cycles, give up with a clear failure instead of letting
+                        // the download cycle "downloading → paused" forever.
+                        val reason = applicationContext.getString(R.string.download_couldnt_resume)
+                        Timber.w("$TAG: Download $songId exceeded $MAX_SYSTEM_STOPS system stops — failing permanently")
+                        // Cancel the work permanently so it never re-runs, then
+                        // write FAILED to the in-memory progress so the queue row
+                        // is still visible with an error message.
+                        WorkManager.getInstance(applicationContext).cancelUniqueWork(
+                            LocalFileDownloader.uniqueWorkName(songId),
+                        )
+                        downloader.markFailed(songId, title, artist, reason)
+                        DownloadNotificationManager.cancelPaused(applicationContext, songId)
+                        DownloadNotificationManager.cancelSong(applicationContext, songId)
+                        DownloadNotificationManager.showFailed(applicationContext, title, reason)
+                    } else {
+                        DownloadNotificationManager.postPaused(
+                            applicationContext, songId, title, artist,
+                            applicationContext.getString(R.string.download_waiting_for_network),
+                        )
+                    }
                 }
             }
             throw e
@@ -113,7 +132,7 @@ class LocalFileDownloadWorker(
                 downloader.markPaused(songId, title, artist, e.message)
                 DownloadNotificationManager.postPaused(
                     applicationContext, songId, title, artist,
-                    e.cause?.message?.take(80) ?: e.message?.take(80),
+                    applicationContext.getString(R.string.download_waiting_for_network),
                 )
                 Result.retry()
             } else {
@@ -182,5 +201,8 @@ class LocalFileDownloadWorker(
         const val KEY_TITLE = "title"
         const val KEY_ARTIST = "artist"
         private const val MAX_RETRIES = 3
+
+        /** Ceiling on pause/resume cycles caused by system stops (network loss). */
+        private const val MAX_SYSTEM_STOPS = 5
     }
 }

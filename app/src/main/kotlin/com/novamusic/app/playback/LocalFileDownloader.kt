@@ -54,6 +54,7 @@ data class LocalDownloadState(
     val error: String? = null,
     val localPath: String? = null,
     val isPaused: Boolean = false,
+    val stopCount: Int = 0,
 ) {
     enum class State {
         QUEUED,
@@ -341,16 +342,23 @@ constructor(
      * The progress entry keeps the last known DOWNLOADING state so the Download
      * Queue still shows the row (with a "paused" indicator) instead of the
      * download silently vanishing.
+     *
+     * Returns the number of times this download has been paused within the
+     * current session (including this call). Callers use it as a ceiling so a
+     * download that keeps getting interrupted (e.g. flaky network) eventually
+     * transitions to a permanent failure instead of cycling forever.
      */
     suspend fun markPaused(
         songId: String,
         title: String,
         artist: String,
         error: String? = null,
-    ) {
+    ): Int {
         val safeTitle = title.ifBlank { songId }
+        var newStopCount = 0
         _progress.update { map ->
             val current = map[songId]
+            newStopCount = (current?.stopCount ?: 0) + 1
             map + (
                 songId to LocalDownloadState(
                     songId = songId,
@@ -362,6 +370,36 @@ constructor(
                     totalBytes = current?.totalBytes ?: 0L,
                     error = error ?: current?.error,
                     isPaused = true,
+                    stopCount = newStopCount,
+                )
+                )
+        }
+        return newStopCount
+    }
+
+    /**
+     * Marks a download as permanently failed without throwing (used when a
+     * download exceeded its pause/resume ceiling). The queue row stays visible
+     * with the FAILED state so the user can remove it.
+     */
+    suspend fun markFailed(
+        songId: String,
+        title: String,
+        artist: String,
+        error: String?,
+    ) {
+        val safeTitle = title.ifBlank { songId }
+        _progress.update { map ->
+            val current = map[songId]
+            map + (
+                songId to LocalDownloadState(
+                    songId = songId,
+                    title = safeTitle,
+                    artist = artist,
+                    state = LocalDownloadState.State.FAILED,
+                    progress = current?.progress ?: 0f,
+                    error = error,
+                    isPaused = false,
                 )
                 )
         }
