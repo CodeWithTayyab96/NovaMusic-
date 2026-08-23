@@ -27,6 +27,7 @@ data class DownloadItem(
     val artist: String,
     val state: LocalDownloadState.State,
     val progress: Float,
+    val isPaused: Boolean = false,
 )
 
 @HiltViewModel
@@ -41,10 +42,6 @@ class DownloadQueueViewModel @Inject constructor(
     ) { progressMap, allSongs ->
         val songMap = allSongs.associateBy { it.id }
         progressMap.values
-            .filter {
-                it.state == LocalDownloadState.State.QUEUED ||
-                    it.state == LocalDownloadState.State.DOWNLOADING
-            }
             .map { state ->
                 DownloadItem(
                     songId = state.songId,
@@ -53,8 +50,11 @@ class DownloadQueueViewModel @Inject constructor(
                     artist = state.artist,
                     state = state.state,
                     progress = state.progress,
+                    isPaused = state.isPaused,
                 )
             }
+            .sortedByDescending { it.isPaused }
+            .sortedByDescending { it.state == LocalDownloadState.State.DOWNLOADING || it.state == LocalDownloadState.State.QUEUED }
             .sortedBy { it.title }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

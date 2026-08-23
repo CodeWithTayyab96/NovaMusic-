@@ -110,6 +110,10 @@ fun DownloadQueueItem(
         item.state == LocalDownloadState.State.QUEUED ||
             item.state == LocalDownloadState.State.DOWNLOADING
 
+    val pausedText = if (item.isPaused) {
+        stringResource(R.string.download_paused)
+    } else null
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -148,8 +152,8 @@ fun DownloadQueueItem(
             }
 
             val statusText = when (item.state) {
-                LocalDownloadState.State.QUEUED -> stringResource(R.string.queued)
-                LocalDownloadState.State.DOWNLOADING -> stringResource(R.string.downloading)
+                LocalDownloadState.State.QUEUED -> if (item.isPaused) stringResource(R.string.download_paused) else stringResource(R.string.queued)
+                LocalDownloadState.State.DOWNLOADING -> if (item.isPaused) stringResource(R.string.download_paused) else stringResource(R.string.downloading)
                 LocalDownloadState.State.COMPLETED -> stringResource(R.string.completed)
                 LocalDownloadState.State.FAILED -> stringResource(R.string.failed)
             }

@@ -41,7 +41,7 @@ object DownloadNotificationManager {
     private const val BASE_SONG_NOTIFICATION_ID = 6000
     private const val COMPLETED_NOTIFICATION_ID = 7001
     private const val FAILED_NOTIFICATION_ID = 7002
-    private const val COMPLETED_VISIBLE_MS = 4000L
+    private const val COMPLETED_VISIBLE_MS = 15_000L
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -168,6 +168,51 @@ object DownloadNotificationManager {
 
     /** Dismisses the per-song notification for [songId]. */
     fun cancelSong(context: Context, songId: String) {
+        runCatching { NotificationManagerCompat.from(context).cancel(songNotificationId(songId)) }
+    }
+
+    /**
+     * Shows a "paused" notification for a download that was interrupted (retry
+     * backoff, network constraint lost) but NOT cancelled. Reuses the song's
+     * notification id so it replaces the progress notification in place, and is
+     * marked ongoing so the user can't accidentally swipe the download away.
+     * The next worker run replaces it with a fresh progress notification.
+     */
+    fun postPaused(
+        context: Context,
+        songId: String,
+        title: String,
+        artist: String,
+        reason: String? = null,
+    ) {
+        val contentText = reason?.takeIf { it.isNotBlank() }?.let {
+            context.getString(R.string.download_paused_reason, it)
+        } ?: context.getString(R.string.download_paused)
+        val notification =
+            NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(R.drawable.downloading)
+                .setContentTitle(title)
+                .setContentText(contentText)
+                .setSubText(artist.ifBlank { null })
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setOnlyAlertOnce(true)
+                .setOngoing(true)
+                .setGroup(GROUP_KEY)
+                .setContentIntent(downloadQueueIntent(context))
+                .addAction(
+                    R.drawable.close,
+                    context.getString(R.string.action_cancel),
+                    cancelIntent(context, songId),
+                )
+                .build()
+        runCatching {
+            NotificationManagerCompat.from(context)
+                .notify(songNotificationId(songId), notification)
+        }
+    }
+
+    /** Dismisses a paused notification left behind by an interrupted download. */
+    fun cancelPaused(context: Context, songId: String) {
         runCatching { NotificationManagerCompat.from(context).cancel(songNotificationId(songId)) }
     }
 

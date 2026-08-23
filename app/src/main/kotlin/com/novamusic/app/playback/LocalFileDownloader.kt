@@ -53,6 +53,7 @@ data class LocalDownloadState(
     val totalBytes: Long = 0,
     val error: String? = null,
     val localPath: String? = null,
+    val isPaused: Boolean = false,
 ) {
     enum class State {
         QUEUED,
@@ -60,6 +61,9 @@ data class LocalDownloadState(
         COMPLETED,
         FAILED,
     }
+
+    val isActive: Boolean get() =
+        this.state == State.QUEUED || this.state == State.DOWNLOADING
 }
 
 /**
@@ -331,6 +335,39 @@ constructor(
     }
 
     /**
+     * Marks an in-flight download as paused (waiting for a retry / for network
+     * constraints to be met again). The download is NOT cancelled: WorkManager
+     * re-runs the worker later and [download] resumes from the retry attempt.
+     * The progress entry keeps the last known DOWNLOADING state so the Download
+     * Queue still shows the row (with a "paused" indicator) instead of the
+     * download silently vanishing.
+     */
+    suspend fun markPaused(
+        songId: String,
+        title: String,
+        artist: String,
+        error: String? = null,
+    ) {
+        val safeTitle = title.ifBlank { songId }
+        _progress.update { map ->
+            val current = map[songId]
+            map + (
+                songId to LocalDownloadState(
+                    songId = songId,
+                    title = safeTitle,
+                    artist = artist,
+                    state = LocalDownloadState.State.DOWNLOADING,
+                    progress = current?.progress ?: 0f,
+                    bytesDownloaded = current?.bytesDownloaded ?: 0L,
+                    totalBytes = current?.totalBytes ?: 0L,
+                    error = error ?: current?.error,
+                    isPaused = true,
+                )
+                )
+        }
+    }
+
+    /**
      * Cancels any in-flight download and removes the local file + database flags
      * for a song downloaded by this app.
      */
@@ -568,6 +605,7 @@ constructor(
         fun enqueue(context: Context, songId: String, title: String, artist: String) {
             val request =
                 OneTimeWorkRequestBuilder<LocalFileDownloadWorker>()
+                    .addTag(LocalFileDownloadWorker.WORK_TAG)
                     .setInputData(
                         workDataOf(
                             LocalFileDownloadWorker.KEY_SONG_ID to songId,

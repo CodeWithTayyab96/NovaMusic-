@@ -7,13 +7,19 @@
 package com.novamusic.app.playback
 
 import android.content.Context
+import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import android.util.Log
 import com.novamusic.app.di.LocalFileDownloaderEntryPoint
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import timber.log.Timber
 
 /**
  * WorkManager worker that downloads a song to disk via [LocalFileDownloader].
@@ -36,6 +42,9 @@ class LocalFileDownloadWorker(
         val title = inputData.getString(KEY_TITLE) ?: songId
         val artist = inputData.getString(KEY_ARTIST).orEmpty()
 
+        // Clear any stale paused notification that may have been left behind by
+        // a previous worker run that was interrupted (retry backoff, constraint loss).
+        DownloadNotificationManager.cancelPaused(applicationContext, songId)
         DownloadNotificationManager.ensureChannel(applicationContext)
 
         val downloader =
@@ -58,22 +67,57 @@ class LocalFileDownloadWorker(
                 updateNotifications(downloader, state)
             }
 
+            DownloadNotificationManager.cancelPaused(applicationContext, songId)
             DownloadNotificationManager.cancelSong(applicationContext, songId)
             DownloadNotificationManager.showCompleted(applicationContext, title)
             Result.success()
         } catch (e: CancellationException) {
-            // The byte-copy loop can re-add a DOWNLOADING entry to the progress map after the
-            // cancel action already removed it (one more non-suspending _progress.update before
-            // cancellation propagates at the next read suspension point). Re-remove it here so
-            // the Download Queue UI never shows a stuck forever-downloading row.
-            downloader.cancelWork(applicationContext, songId)
-            DownloadNotificationManager.cancelSong(applicationContext, songId)
+            // Use NonCancellable so cleanup runs even though the coroutine is
+            // being cancelled (the thread is not cancelled, only the coroutine).
+            withContext(NonCancellable + Dispatchers.IO) {
+                val isUserCancel = runCatching {
+                    WorkManager.getInstance(applicationContext)
+                        .getWorkInfoById(id)
+                        .get()  // blocking, not suspending
+                        ?.state == WorkInfo.State.CANCELLED
+                }.getOrElse { false }
+
+                if (isUserCancel) {
+                    // Genuine user cancel (Cancel button, deleteLocalFile, or
+                    // REPLACE re-enqueue). Clean up permanently.
+                    Timber.w("$TAG: User cancelled download $songId")
+                    downloader.cancelWork(applicationContext, songId)
+                    DownloadNotificationManager.cancelPaused(applicationContext, songId)
+                    DownloadNotificationManager.cancelSong(applicationContext, songId)
+                } else {
+                    // System-initiated stop: constraint no longer met (network
+                    // lost), process teardown, or WorkManager re-enqueue (REPLACE).
+                    // Do NOT call cancelWork — let WorkManager re-queue and
+                    // re-run the worker when constraints are satisfied again.
+                    // Show a paused notification so the download doesn't silently
+                    // vanish from the user's view.
+                    Timber.w("$TAG: Download $songId interrupted by system stop — paused until constraints re-met")
+                    downloader.markPaused(songId, title, artist, e.message)
+                    DownloadNotificationManager.postPaused(
+                        applicationContext, songId, title, artist,
+                        "Waiting for network",
+                    )
+                }
+            }
             throw e
         } catch (e: Exception) {
             Log.e(TAG, "Download failed for $songId (attempt ${runAttemptCount + 1}/$MAX_RETRIES): ${e.message}", e)
             if (runAttemptCount < MAX_RETRIES) {
+                // Transition notification to "paused — will retry" instead of
+                // vanishing completely during the backoff interval.
+                downloader.markPaused(songId, title, artist, e.message)
+                DownloadNotificationManager.postPaused(
+                    applicationContext, songId, title, artist,
+                    e.cause?.message?.take(80) ?: e.message?.take(80),
+                )
                 Result.retry()
             } else {
+                DownloadNotificationManager.cancelPaused(applicationContext, songId)
                 DownloadNotificationManager.cancelSong(applicationContext, songId)
                 val reason = e.cause?.message?.take(120) ?: e.message?.take(120)
                 DownloadNotificationManager.showFailed(applicationContext, title, reason)
@@ -91,6 +135,13 @@ class LocalFileDownloadWorker(
         downloader: LocalFileDownloader,
         state: LocalDownloadState,
     ) {
+        if (state.isPaused) {
+            DownloadNotificationManager.postPaused(
+                applicationContext, state.songId, state.title, state.artist,
+                state.error?.take(80),
+            )
+            return
+        }
         when (state.state) {
             LocalDownloadState.State.QUEUED,
             LocalDownloadState.State.DOWNLOADING,
@@ -105,15 +156,17 @@ class LocalFileDownloadWorker(
 
             LocalDownloadState.State.COMPLETED,
             LocalDownloadState.State.FAILED,
-            -> DownloadNotificationManager.cancelSong(applicationContext, state.songId)
+            -> {
+                DownloadNotificationManager.cancelPaused(applicationContext, state.songId)
+                DownloadNotificationManager.cancelSong(applicationContext, state.songId)
+            }
         }
 
         // When several songs download in parallel the shared progress map holds them all;
         // refresh the summary so "Downloading N songs" + overall progress stay current.
         val active =
-            downloader.progress.value.values.filter {
-                it.state == LocalDownloadState.State.QUEUED ||
-                    it.state == LocalDownloadState.State.DOWNLOADING
+            downloader.progress.value.values.filter { state ->
+                state.isActive || state.isPaused
             }
         if (active.size > 1) {
             DownloadNotificationManager.postGrouped(applicationContext, active)
@@ -124,6 +177,7 @@ class LocalFileDownloadWorker(
 
     companion object {
         private const val TAG = "LocalFileDownloadWorker"
+        const val WORK_TAG = "local_download"
         const val KEY_SONG_ID = "song_id"
         const val KEY_TITLE = "title"
         const val KEY_ARTIST = "artist"

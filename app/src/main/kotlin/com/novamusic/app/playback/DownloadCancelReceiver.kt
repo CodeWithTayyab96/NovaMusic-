@@ -29,8 +29,16 @@ class DownloadCancelReceiver : BroadcastReceiver() {
                             .fromApplication(appContext, LocalFileDownloaderEntryPoint::class.java)
                             .localFileDownloader()
                     }.getOrNull()
-                downloader?.progress?.value?.keys?.toList()?.forEach { songId ->
-                    downloader.cancelWork(appContext, songId)
+                val songIds = downloader?.progress?.value?.keys?.toList().orEmpty()
+                songIds.forEach { songId ->
+                    downloader?.cancelWork(appContext, songId)
+                    DownloadNotificationManager.cancelPaused(appContext, songId)
+                    DownloadNotificationManager.cancelSong(appContext, songId)
+                }
+                if (songIds.isEmpty()) {
+                    // No in-memory progress (process restarted): the paused/queued
+                    // notifications may still be up; cancel them via WorkManager.
+                    WorkManager.getInstance(appContext).cancelAllWorkByTag(LocalFileDownloadWorker.WORK_TAG)
                 }
             }
 
@@ -44,6 +52,11 @@ class DownloadCancelReceiver : BroadcastReceiver() {
                         }.getOrNull()
                     downloader?.cancelWork(appContext, songId)
                         ?: WorkManager.getInstance(appContext).cancelUniqueWork(LocalFileDownloader.uniqueWorkName(songId))
+                    // Also dismiss paused/queued notifications: a paused (non-running)
+                    // worker never executes its CancellationException handler, so the
+                    // notification would otherwise stay up with a dead Cancel button.
+                    DownloadNotificationManager.cancelPaused(appContext, songId)
+                    DownloadNotificationManager.cancelSong(appContext, songId)
                 }
             }
         }
