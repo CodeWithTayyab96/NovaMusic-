@@ -166,6 +166,7 @@ import com.novamusic.app.playback.queues.filterVideo
 import com.novamusic.app.utils.CoilBitmapLoader
 import com.novamusic.app.utils.DiscordRPC
 import com.novamusic.app.ui.screens.settings.DiscordPresenceManager
+import com.novamusic.app.utils.SecureCredentialStore
 import com.novamusic.app.utils.SyncUtils
 import com.novamusic.app.utils.YTPlayerUtils
 import com.novamusic.app.utils.StreamClientUtils
@@ -953,10 +954,11 @@ class MusicService :
         }
 
         dataStore.data
-            .map { it[DiscordTokenKey] to (it[EnableDiscordRPCKey] ?: true) }
+            .map { it[EnableDiscordRPCKey] ?: true }
             .debounce(300)
             .distinctUntilChanged()
-            .collectLatest(scope) { (key, enabled) ->
+            .collectLatest(scope) { enabled ->
+                val key = SecureCredentialStore.getString(DiscordTokenKey.name).takeIf { it.isNotEmpty() }
                 val newRpc =
                     withContext(Dispatchers.IO) {
                         if (!key.isNullOrBlank() && enabled) {
@@ -1664,8 +1666,9 @@ class MusicService :
         clearAutomix()
         automixSeedMediaId = null
         autoAddedMediaIds.clear()
-        if (queue.preloadItem != null) {
-            player.setMediaItem(queue.preloadItem!!.toMediaItem())
+        val preloadItem = queue.preloadItem
+        if (preloadItem != null) {
+            player.setMediaItem(preloadItem.toMediaItem())
             player.prepare()
             player.playWhenReady = playWhenReady
         }

@@ -108,6 +108,7 @@ import com.novamusic.app.ui.component.YouTubeGridItem
 import com.novamusic.app.ui.component.shimmer.GridItemPlaceHolder
 import com.novamusic.app.ui.component.shimmer.ShimmerHost
 import com.novamusic.app.ui.component.shimmer.TextPlaceholder
+import timber.log.Timber
 import com.novamusic.app.ui.menu.AlbumMenu
 import com.novamusic.app.ui.menu.ArtistMenu
 import com.novamusic.app.ui.menu.SongMenu
@@ -1001,7 +1002,14 @@ fun SimilarRecommendationsTitle(
         },
         onClick = {
             when (recommendation.title) {
-                is Song -> navController.navigate("album/${recommendation.title.album!!.id}")
+                is Song -> {
+                    val album = recommendation.title.album
+                    if (album != null) {
+                        navController.navigate("album/${album.id}")
+                    } else {
+                        Timber.w("HomeScreenComponents: recommendation song had null album; skipping navigation")
+                    }
+                }
                 is Album -> navController.navigate("album/${recommendation.title.id}")
                 is Artist -> navController.navigate("artist/${recommendation.title.id}")
                 is Playlist -> {}

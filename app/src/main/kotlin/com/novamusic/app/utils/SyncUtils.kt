@@ -145,10 +145,9 @@ class SyncUtils @Inject constructor(
      * Check if user is properly logged in with a valid SAPISID cookie
      */
     private suspend fun isLoggedIn(): Boolean {
-        val cookie = context.dataStore.data
-            .map { it[InnerTubeCookieKey] }
-            .first()
-        return cookie?.let { "SAPISID" in parseCookieString(it) } ?: false
+        val cookie = SecureCredentialStore.getString(InnerTubeCookieKey.name)
+            .ifEmpty { context.dataStore.data.map { it[InnerTubeCookieKey] }.first().orEmpty() }
+        return "SAPISID" in parseCookieString(cookie)
     }
 
     private suspend fun isYtmSyncEnabled(): Boolean {

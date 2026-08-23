@@ -58,7 +58,7 @@ object LastFM {
         format: String = "json"
     ) {
         contentType(ContentType.Application.FormUrlEncoded)
-        userAgent("OpenTune (https://github.com/Arturo254/OpenTune)")
+        userAgent("NovaMusic (https://github.com/CodeWithTayyab96/NovaMusic-)")
         val paramsForSig = mutableMapOf(
             "method" to method,
             "api_key" to apiKey

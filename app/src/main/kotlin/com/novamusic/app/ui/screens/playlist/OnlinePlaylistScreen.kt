@@ -608,11 +608,12 @@ fun OnlinePlaylistScreen(
                                                             )
                                                             .toSpanStyle()
                                                 ) {
-                                                    if (artist.id != null) {
+                                                    val artistId = artist.id
+                                                    if (artistId != null) {
                                                         val link =
-                                                            LinkAnnotation.Clickable(artist.id!!) {
+                                                            LinkAnnotation.Clickable(artistId) {
                                                                 navController.navigate(
-                                                                    "artist/${artist.id}"
+                                                                    "artist/$artistId"
                                                                 )
                                                             }
                                                         withLink(link) { append(artist.name) }
@@ -1114,7 +1115,7 @@ fun OnlinePlaylistScreen(
                                     songSelection =
                                         wrappedSongs
                                             .filter { it.isSelected }
-                                            .map { it.item.second.toMediaItem().metadata!! },
+                                            .mapNotNull { it.item.second.toMediaItem().metadata },
                                     onDismiss = menuState::dismiss,
                                     clearAction = { selection = false },
                                     currentItems = emptyList()

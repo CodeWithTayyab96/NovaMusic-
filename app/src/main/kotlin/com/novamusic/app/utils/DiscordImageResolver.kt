@@ -72,11 +72,13 @@ object DiscordImageResolver {
         var thumbnailResolved: String? = savedArtwork?.thumbnail?.takeIf { it.isNotBlank() && it.isResolvedId() }
         var artistResolved: String? = savedArtwork?.artist?.takeIf { it.isNotBlank() && it.isResolvedId() }
 
-        if (thumbnailResolved != null) {
-            thumbnailUrl?.let { repository.putToCache(it, thumbnailResolved!!) }
+        val resolvedThumbnail = thumbnailResolved
+        if (resolvedThumbnail != null) {
+            thumbnailUrl?.let { url -> repository.putToCache(url, resolvedThumbnail) }
         }
-        if (artistResolved != null) {
-            artistUrl?.let { repository.putToCache(it, artistResolved!!) }
+        val resolvedArtist = artistResolved
+        if (resolvedArtist != null) {
+            artistUrl?.let { url -> repository.putToCache(url, resolvedArtist) }
         }
 
         val result = withTimeoutOrNull(RESOLUTION_TIMEOUT_MS) {

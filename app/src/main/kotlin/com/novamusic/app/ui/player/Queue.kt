@@ -887,10 +887,13 @@ fun Queue(
                                     selectedItems.clear()
                                 } else {
                                     queueWindows
-                                        .filter { it.mediaItem.metadata!! !in selectedSongs }
+                                        .filter { it.mediaItem.metadata != null }
                                         .forEach {
-                                            selectedSongs.add(it.mediaItem.metadata!!)
-                                            selectedItems.add(it)
+                                            val metadata = it.mediaItem.metadata
+                                            if (metadata != null && metadata !in selectedSongs) {
+                                                selectedSongs.add(metadata)
+                                                selectedItems.add(it)
+                                            }
                                         }
                                 }
                             },

@@ -101,7 +101,8 @@ class TogetherOnlineApi(
                 }
             }
         }
-        throw lastException!!
+        throw lastException
+            ?: IllegalStateException("Together API call failed after $maxAttempts attempts with no exception captured")
     }
 
     private fun isRetryable(t: Throwable): Boolean {

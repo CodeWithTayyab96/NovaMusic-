@@ -2,6 +2,12 @@
 <full-backup-content>
     <exclude
         domain="file"
+        path="./datastore" />
+    <exclude
+        domain="sharedpref"
+        path="secure_credentials" />
+    <exclude
+        domain="file"
         path="./exoplayer" />
     <exclude
         domain="file"

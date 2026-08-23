@@ -13,6 +13,7 @@
 
 package com.novamusic.app.canvas.providers
 
+import android.util.Log
 import com.novamusic.app.canvas.CanvasArtwork
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -40,7 +41,12 @@ import java.util.concurrent.ConcurrentHashMap
 
 object AppleMusicCanvasProvider {
 
-    // JWT público de solo lectura del web player de Apple Music (By Vivi Music)
+    private const val TAG = "AppleMusicCanvas"
+
+    // JWT público de solo lectura del web player de Apple Music (By Vivi Music).
+    // ADVERTENCIA: este token caduca (claim `exp` = 1784056855 ≈ 2026-07-14).
+    // Cuando caduque, la API devuelve 401 y este proveedor degrada silenciosamente
+    // a "sin canvas" — se registra un warning en [handleNonOkStatus].
     private const val APPLE_MUSIC_TOKEN =
         "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiIsImtpZCI6IldlYlBsYXlLaWQifQ" +
                 ".eyJpc3MiOiJBTVBXZWJQbGF5IiwiaWF0IjoxNzgxMDMyODU1LCJleHAiOjE3ODQw" +
@@ -48,6 +54,25 @@ object AppleMusicCanvasProvider {
                 ".fiMFcJWkfSlxKP9NVA0UW9CbItD1Rge0SISuepz203XcpU762OqdCpU9M-YkmtKkjRmaIWtjsfGgqZPrlMonpA"
 
     private const val AMP_BASE_URL = "https://amp-api.music.apple.com"
+
+    /**
+     * Logs a clear warning when the hardcoded Apple Music token is rejected
+     * (401 Unauthorized / expired JWT) instead of failing silently. Returns
+     * true when the response is NOT OK, so callers bail out gracefully.
+     */
+    private fun handleNonOkStatus(statusCode: Int): Boolean {
+        if (statusCode == 401) {
+            Log.w(
+                TAG,
+                "Apple Music API rejected the hardcoded token (HTTP 401). The JWT " +
+                    "(exp ≈ 2026-07-14) is expired or revoked — canvas/artist-background " +
+                    "features are disabled until a fresh token is supplied.",
+            )
+        } else if (statusCode !in 200..299) {
+            Log.w(TAG, "Apple Music API returned HTTP $statusCode; skipping artwork fetch")
+        }
+        return statusCode !in 200..299
+    }
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -136,7 +161,7 @@ object AppleMusicCanvasProvider {
             parameter("extend", "editorialVideo")
             parameter("include", "albums")
         }
-        if (response.status != HttpStatusCode.OK) return@runCatching null
+        if (handleNonOkStatus(response.status.value)) return@runCatching null
 
         val root = response.body<JsonObject>()
         val results = root["results"]?.jsonObject
@@ -276,7 +301,7 @@ object AppleMusicCanvasProvider {
                 parameter("extend", "editorialVideo")
                 parameter("include", "tracks")
             }
-            if (response.status != HttpStatusCode.OK) return@runCatching null
+            if (handleNonOkStatus(response.status.value)) return@runCatching null
 
             val root = response.body<JsonObject>()
             val data = root["data"]?.jsonArray

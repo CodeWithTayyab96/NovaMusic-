@@ -30,6 +30,7 @@ import com.novamusic.app.constants.SpotifySpKeyKey
 import com.novamusic.app.spotify.models.SpotifyPlaylist
 import com.novamusic.app.spotify.models.SpotifyPlaylistTracksRef
 import com.novamusic.app.spotify.models.SpotifyTrack
+import com.novamusic.app.utils.SecureCredentialStore
 import com.novamusic.app.utils.clearWebAuthSession
 import com.novamusic.app.utils.dataStore
 import com.novamusic.app.utils.reportException
@@ -78,8 +79,14 @@ constructor(
     suspend fun restoreSession(): SpotifyAccountSession =
         withContext(Dispatchers.IO) {
             val prefs = context.dataStore.data.first()
-            val token = prefs[SpotifyAccessTokenKey].orEmpty()
-            val expiresAt = prefs[SpotifyAccessTokenExpiresAtKey] ?: 0L
+            val token =
+                SecureCredentialStore.getString(SpotifyAccessTokenKey.name).takeIf { it.isNotEmpty() }
+                    ?: prefs[SpotifyAccessTokenKey].orEmpty()
+            val expiresAt =
+                SecureCredentialStore.getLong(
+                    SpotifyAccessTokenExpiresAtKey.name,
+                    prefs[SpotifyAccessTokenExpiresAtKey] ?: 0L,
+                )
             val accountName = prefs[SpotifyAccountNameKey].orEmpty()
             val avatarUrl = prefs[SpotifyAccountAvatarUrlKey]
 
@@ -92,10 +99,12 @@ constructor(
                 )
             }
 
-            val spDc = prefs[SpotifySpDcKey].orEmpty()
+            val spDc =
+                SecureCredentialStore.getString(SpotifySpDcKey.name).takeIf { it.isNotEmpty() }
+                    ?: prefs[SpotifySpDcKey].orEmpty()
             if (spDc.isBlank()) return@withContext SpotifyAccountSession()
 
-            refreshAccessToken(spDc = spDc, spKey = prefs[SpotifySpKeyKey].orEmpty())
+            refreshAccessToken(spDc = spDc, spKey = readSpKey(prefs))
                 .fold(
                     onSuccess = {
                         val refreshed = context.dataStore.data.first()
@@ -118,14 +127,14 @@ constructor(
         spKey: String,
     ): SpotifyAccountSession =
         withContext(Dispatchers.IO) {
+            SecureCredentialStore.putString(SpotifySpDcKey.name, spDc)
             context.dataStore.edit { prefs ->
-                prefs[SpotifySpDcKey] = spDc
                 prefs.remove(SpotifyLibraryPlaylistsCacheKey)
-                if (spKey.isNotBlank()) {
-                    prefs[SpotifySpKeyKey] = spKey
-                } else {
-                    prefs.remove(SpotifySpKeyKey)
-                }
+            }
+            if (spKey.isNotBlank()) {
+                SecureCredentialStore.putString(SpotifySpKeyKey.name, spKey)
+            } else {
+                SecureCredentialStore.remove(SpotifySpKeyKey.name)
             }
             _playlists.value = emptyList()
             _errorMessage.value = null
@@ -140,11 +149,11 @@ constructor(
 
     suspend fun logout() {
         withContext(Dispatchers.IO) {
+            SecureCredentialStore.remove(SpotifySpDcKey.name)
+            SecureCredentialStore.remove(SpotifySpKeyKey.name)
+            SecureCredentialStore.remove(SpotifyAccessTokenKey.name)
+            SecureCredentialStore.remove(SpotifyAccessTokenExpiresAtKey.name)
             context.dataStore.edit { prefs ->
-                prefs.remove(SpotifySpDcKey)
-                prefs.remove(SpotifySpKeyKey)
-                prefs.remove(SpotifyAccessTokenKey)
-                prefs.remove(SpotifyAccessTokenExpiresAtKey)
                 prefs.remove(SpotifyAccountNameKey)
                 prefs.remove(SpotifyAccountAvatarUrlKey)
                 prefs.remove(SpotifyLibraryPlaylistsCacheKey)
@@ -223,19 +232,31 @@ constructor(
 
     private suspend fun ensureAuthenticated() {
         val prefs = context.dataStore.data.first()
-        val token = prefs[SpotifyAccessTokenKey].orEmpty()
-        val expiresAt = prefs[SpotifyAccessTokenExpiresAtKey] ?: 0L
+        val token =
+            SecureCredentialStore.getString(SpotifyAccessTokenKey.name).takeIf { it.isNotEmpty() }
+                ?: prefs[SpotifyAccessTokenKey].orEmpty()
+        val expiresAt =
+            SecureCredentialStore.getLong(
+                SpotifyAccessTokenExpiresAtKey.name,
+                prefs[SpotifyAccessTokenExpiresAtKey] ?: 0L,
+            )
         if (token.isNotBlank() && expiresAt > System.currentTimeMillis() + TOKEN_EXPIRY_GRACE_MS) {
             Spotify.accessToken = token
             return
         }
 
-        val spDc = prefs[SpotifySpDcKey].orEmpty()
+        val spDc =
+            SecureCredentialStore.getString(SpotifySpDcKey.name).takeIf { it.isNotEmpty() }
+                ?: prefs[SpotifySpDcKey].orEmpty()
         if (spDc.isBlank()) {
             throw IllegalStateException(context.getString(R.string.spotify_not_connected))
         }
-        refreshAccessToken(spDc = spDc, spKey = prefs[SpotifySpKeyKey].orEmpty()).getOrThrow()
+        refreshAccessToken(spDc = spDc, spKey = readSpKey(prefs)).getOrThrow()
     }
+
+    private fun readSpKey(prefs: androidx.datastore.preferences.core.Preferences): String =
+        SecureCredentialStore.getString(SpotifySpKeyKey.name).takeIf { it.isNotEmpty() }
+            ?: prefs[SpotifySpKeyKey].orEmpty()
 
     private suspend fun refreshAccessToken(
         spDc: String,
@@ -245,10 +266,11 @@ constructor(
             .fetchAccessToken(spDc = spDc, spKey = spKey)
             .mapCatching { token ->
                 Spotify.accessToken = token.accessToken
-                context.dataStore.edit { prefs ->
-                    prefs[SpotifyAccessTokenKey] = token.accessToken
-                    prefs[SpotifyAccessTokenExpiresAtKey] = token.accessTokenExpirationTimestampMs
-                }
+                SecureCredentialStore.putString(SpotifyAccessTokenKey.name, token.accessToken)
+                SecureCredentialStore.putLong(
+                    SpotifyAccessTokenExpiresAtKey.name,
+                    token.accessTokenExpirationTimestampMs,
+                )
                 refreshProfile()
             }
 
@@ -319,11 +341,13 @@ constructor(
             .getOrElse { error ->
                 if ((error as? Spotify.SpotifyException)?.statusCode != 401) throw error
                 val prefs = context.dataStore.data.first()
-                val spDc = prefs[SpotifySpDcKey].orEmpty()
+                val spDc =
+                    SecureCredentialStore.getString(SpotifySpDcKey.name).takeIf { it.isNotEmpty() }
+                        ?: prefs[SpotifySpDcKey].orEmpty()
                 if (spDc.isBlank()) throw error
                 refreshAccessToken(
                     spDc = spDc,
-                    spKey = prefs[SpotifySpKeyKey].orEmpty()
+                    spKey = readSpKey(prefs)
                 ).getOrThrow()
                 block()
             }

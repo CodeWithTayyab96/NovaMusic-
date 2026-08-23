@@ -30,6 +30,7 @@ import com.novamusic.app.ui.theme.ThemeSeedPalette
 import com.novamusic.app.ui.theme.ThemeSeedPaletteCodec
 import com.novamusic.app.utils.dataStore
 import com.novamusic.app.utils.PreferenceStore
+import com.novamusic.app.utils.SecureCredentialStore
 import com.novamusic.app.utils.get
 import com.novamusic.app.utils.reportException
 import com.novamusic.app.innertube.YouTube
@@ -87,6 +88,14 @@ class App : Application(), SingletonImageLoader.Factory {
             return
         }
         PreferenceStore.start(this)
+        SecureCredentialStore.init(this)
+        applicationScope.launch(Dispatchers.IO) {
+            // One-time: move existing plaintext credentials (YouTube cookie,
+            // Spotify/Discord/Last.fm/ListenBrainz tokens) into the Keystore-
+            // backed encrypted store, then delete the plaintext copies. Users
+            // stay logged in across this migration.
+            SecureCredentialStore.migrateFromDataStore(this@App)
+        }
         Timber.plant(Timber.DebugTree())
         try {
             Timber.plant(com.novamusic.app.utils.GlobalLogTree())
@@ -128,7 +137,9 @@ class App : Application(), SingletonImageLoader.Factory {
                     YouTube.locale = YouTube.locale.copy(hl = lang)
                 }
                 
-                LastFM.sessionKey = prefs[LastFMSessionKey]
+                LastFM.sessionKey =
+                    SecureCredentialStore.getString(LastFMSessionKey.name).takeIf { it.isNotEmpty() }
+                        ?: prefs[LastFMSessionKey]
 
                 if (prefs[ProxyEnabledKey] == true) {
                     try {
@@ -271,10 +282,9 @@ class App : Application(), SingletonImageLoader.Factory {
         }
         applicationScope.launch(Dispatchers.IO) {
             dataStore.data
-                .map { it[LastFMSessionKey] }
-                .distinctUntilChanged()
-                .collect { sessionKey ->
-                    LastFM.sessionKey = sessionKey
+                .collect {
+                    LastFM.sessionKey =
+                        SecureCredentialStore.getString(LastFMSessionKey.name).takeIf { it.isNotEmpty() }
                 }
         }
     }

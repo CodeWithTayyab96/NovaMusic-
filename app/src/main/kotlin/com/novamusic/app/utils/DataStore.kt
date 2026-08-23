@@ -12,6 +12,7 @@ import android.content.Context
 import android.os.Looper
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
@@ -66,8 +67,12 @@ object PreferenceStore {
     }
 }
 
-operator fun <T> DataStore<Preferences>.get(key: Preferences.Key<T>): T? =
-    PreferenceStore.get(key)
+operator fun <T> DataStore<Preferences>.get(key: Preferences.Key<T>): T? {
+    // Credential keys are routed through the Keystore-backed encrypted store.
+    if (SecureCredentialStore.isCredential(key.name)) {
+        return SecureCredentialStore.readSecureCredentialSync(key) ?: PreferenceStore.get(key)
+    }
+    return PreferenceStore.get(key)
         ?: if (Looper.getMainLooper().thread == Thread.currentThread()) {
             null
         } else {
@@ -77,12 +82,19 @@ operator fun <T> DataStore<Preferences>.get(key: Preferences.Key<T>): T? =
                 }
             }
         }
+}
 
 operator fun <T> DataStore<Preferences>.get(
     key: Preferences.Key<T>,
     defaultValue: T,
-): T =
-    PreferenceStore.get(key)
+): T {
+    // Credential keys are routed through the Keystore-backed encrypted store.
+    if (SecureCredentialStore.isCredential(key.name)) {
+        return SecureCredentialStore.readSecureCredentialSync(key)
+            ?: PreferenceStore.get(key)
+            ?: defaultValue
+    }
+    return PreferenceStore.get(key)
         ?: if (Looper.getMainLooper().thread == Thread.currentThread()) {
             defaultValue
         } else {
@@ -92,14 +104,26 @@ operator fun <T> DataStore<Preferences>.get(
                 } ?: defaultValue
             }
         }
+}
 
-suspend fun <T> DataStore<Preferences>.getAsync(key: Preferences.Key<T>): T? =
-    data.first()[key]
+suspend fun <T> DataStore<Preferences>.getAsync(key: Preferences.Key<T>): T? {
+    if (SecureCredentialStore.isCredential(key.name)) {
+        return SecureCredentialStore.readSecureCredentialSync(key) ?: PreferenceStore.get(key)
+    }
+    return data.first()[key]
+}
 
 suspend fun <T> DataStore<Preferences>.getAsync(
     key: Preferences.Key<T>,
     defaultValue: T,
-): T = data.first()[key] ?: defaultValue
+): T {
+    if (SecureCredentialStore.isCredential(key.name)) {
+        return SecureCredentialStore.readSecureCredentialSync(key)
+            ?: PreferenceStore.get(key)
+            ?: defaultValue
+    }
+    return data.first()[key] ?: defaultValue
+}
 
 fun <T> preference(
     context: Context,
@@ -118,6 +142,12 @@ fun <T> rememberPreference(
     key: Preferences.Key<T>,
     defaultValue: T,
 ): MutableState<T> {
+    // Credential keys are routed through the Keystore-backed encrypted store
+    // instead of the (unencrypted, backup-included) DataStore.
+    if (SecureCredentialStore.isCredential(key.name)) {
+        return rememberSecurePreference(key, defaultValue)
+    }
+
     val context = LocalContext.current
 
     val state =
@@ -135,6 +165,44 @@ fun <T> rememberPreference(
                     PreferenceStore.launchEdit(context.dataStore) {
                         this[key] = value
                     }
+                }
+
+            override fun component1() = value
+
+            override fun component2(): (T) -> Unit = { value = it }
+        }
+    }
+}
+
+/**
+ * [rememberPreference] variant for Keystore-encrypted credential keys.
+ * Reads/writes go through [SecureCredentialStore] (synchronous SharedPreferences
+ * backed by AES-GCM with an Android Keystore key).
+ */
+@Composable
+private fun <T> rememberSecurePreference(
+    key: Preferences.Key<T>,
+    defaultValue: T,
+): MutableState<T> {
+    val state =
+        remember {
+            mutableStateOf(
+                SecureCredentialStore.readSecureCredentialSync(key) ?: defaultValue,
+            )
+        }
+
+    return remember {
+        object : MutableState<T> {
+            override var value: T
+                get() = state.value
+                set(value) {
+                    if (key.name == SecureCredentialStore.expiresAtKeyName) {
+                        @Suppress("UNCHECKED_CAST")
+                        SecureCredentialStore.putLong(key.name, value as Long)
+                    } else {
+                        SecureCredentialStore.putString(key.name, value.toString())
+                    }
+                    state.value = value
                 }
 
             override fun component1() = value

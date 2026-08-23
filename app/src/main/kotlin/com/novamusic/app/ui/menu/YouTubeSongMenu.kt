@@ -87,6 +87,7 @@ import com.novamusic.app.utils.makeTimeString
 import com.novamusic.app.utils.rememberPreference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import java.time.LocalDateTime
 
 @SuppressLint("MutableCollectionMutableState")
@@ -484,9 +485,15 @@ fun YouTubeSongMenu(
                         )
                     },
                     modifier = Modifier.clickable {
-                        if (splitArtists.size == 1 && splitArtists[0].originalArtist != null) {
-                            navController.navigate("artist/${splitArtists[0].originalArtist!!.id}")
-                            onDismiss()
+                        if (splitArtists.size == 1) {
+                            val artist = splitArtists[0].originalArtist
+                            if (artist != null) {
+                                navController.navigate("artist/${artist.id}")
+                                onDismiss()
+                            } else {
+                                Timber.w("YouTubeSongMenu: artist id was null; skipping navigation")
+                                showSelectArtistDialog = true
+                            }
                         } else {
                             showSelectArtistDialog = true
                         }

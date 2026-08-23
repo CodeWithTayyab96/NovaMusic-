@@ -123,6 +123,7 @@ import com.novamusic.app.ui.component.TextFieldDialog
 import com.novamusic.app.utils.rememberPreference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import kotlin.math.abs
 import kotlin.math.log2
 import kotlin.math.pow
@@ -535,10 +536,16 @@ fun ColumnScope.PlayerMenu(
                                     Icon(painter = painterResource(R.drawable.artist), contentDescription = null)
                                 },
                                 modifier = Modifier.clickable {
-                                    if (splitArtists.size == 1 && splitArtists[0].originalArtist != null) {
-                                        onDismiss()
-                                        playerBottomSheetState.snapTo(playerBottomSheetState.collapsedBound)
-                                        navController.navigate("artist/${splitArtists[0].originalArtist!!.id}")
+                                    if (splitArtists.size == 1) {
+                                        val artist = splitArtists[0].originalArtist
+                                        if (artist != null) {
+                                            onDismiss()
+                                            playerBottomSheetState.snapTo(playerBottomSheetState.collapsedBound)
+                                            navController.navigate("artist/${artist.id}")
+                                        } else {
+                                            Timber.w("PlayerMenu: artist id was null; skipping navigation")
+                                            showSelectArtistDialog = true
+                                        }
                                     } else {
                                         showSelectArtistDialog = true
                                     }

@@ -490,7 +490,7 @@ fun HistoryScreen(
                             SelectionMediaMetadataMenu(
                                 songSelection = allWrappedItems
                                     .filter { it.isSelected }
-                                    .map { it.item.song.toMediaItem().metadata!! },
+                                    .mapNotNull { it.item.song.toMediaItem().metadata },
                                 onDismiss = menuState::dismiss,
                                 clearAction = { selection = false },
                                 currentItems = emptyList()
