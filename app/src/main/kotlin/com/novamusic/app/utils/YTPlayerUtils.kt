@@ -173,6 +173,10 @@ object YTPlayerUtils {
         // if provided, this preference overrides ConnectivityManager.isActiveNetworkMetered
         networkMetered: Boolean? = null,
         avoidCodecs: Set<String> = emptySet(),
+        // Downloads prefer AAC (m4a) — universally playable in external players and
+        // Android's own media stack — over Opus (webm), which only ExoPlayer handles
+        // well. Playback keeps the default (Opus preferred, better quality per bit).
+        preferAac: Boolean = false,
     ): Result<PlaybackData> = runCatching {
         val attempts =
             when (audioQuality) {
@@ -193,6 +197,7 @@ object YTPlayerUtils {
                         preferredStreamClient = preferredStreamClient,
                         networkMetered = networkMetered,
                         avoidCodecs = avoidCodecs,
+                        preferAac = preferAac,
                     )
                 }
             if (attemptResult.isSuccess) return@runCatching attemptResult.getOrThrow()
@@ -209,6 +214,7 @@ object YTPlayerUtils {
         preferredStreamClient: PlayerStreamClient,
         networkMetered: Boolean?,
         avoidCodecs: Set<String>,
+        preferAac: Boolean,
     ): PlaybackData {
         Timber.tag(logTag).i("Fetching player response for videoId: $videoId, playlistId: $playlistId")
         val signatureTimestamp = getSignatureTimestampOrNull(videoId)
@@ -319,6 +325,7 @@ object YTPlayerUtils {
                     audioQuality,
                     isMetered,
                     avoidCodecs = avoidCodecs,
+                    preferAac = preferAac,
                 )
 
             if (candidates.isEmpty()) continue
@@ -475,8 +482,12 @@ object YTPlayerUtils {
         audioQuality: AudioQuality,
         networkMetered: Boolean,
         avoidCodecs: Set<String> = emptySet(),
+        preferAac: Boolean = false,
     ): List<PlayerResponse.StreamingData.Format> {
-        Timber.tag(logTag).i("Finding format with audioQuality: $audioQuality, network metered: $networkMetered")
+        Timber.tag(logTag).i(
+            "Finding format with audioQuality: $audioQuality, network metered: $networkMetered" +
+                (if (preferAac) ", preferAac=true" else ""),
+        )
 
         val audioFormats =
             playerResponse.streamingData?.adaptiveFormats
@@ -509,13 +520,13 @@ object YTPlayerUtils {
         val preferHigher =
             compareByDescending<PlayerResponse.StreamingData.Format> { it.url != null }
                 .thenByDescending { it.bitrate }
-                .thenByDescending { codecRank(extractCodec(it.mimeType)) }
+                .thenByDescending { codecRank(extractCodec(it.mimeType), preferAac) }
                 .thenByDescending { it.audioSampleRate ?: 0 }
 
         val preferLowerAboveTarget =
             compareByDescending<PlayerResponse.StreamingData.Format> { it.url != null }
                 .thenBy { it.bitrate }
-                .thenByDescending { codecRank(extractCodec(it.mimeType)) }
+                .thenByDescending { codecRank(extractCodec(it.mimeType), preferAac) }
                 .thenByDescending { it.audioSampleRate ?: 0 }
 
         val candidates =
@@ -569,11 +580,11 @@ object YTPlayerUtils {
         return true
     }
 
-    private fun codecRank(codec: String?): Int =
+    private fun codecRank(codec: String?, preferAac: Boolean = false): Int =
         when {
             codec.isNullOrBlank() -> 0
-            codec.contains("opus", ignoreCase = true) -> 3
-            codec.contains("mp4a", ignoreCase = true) -> 2
+            codec.contains("mp4a", ignoreCase = true) -> if (preferAac) 3 else 2
+            codec.contains("opus", ignoreCase = true) -> if (preferAac) 2 else 3
             else -> 1
         }
     private fun isLikelyPreview(

@@ -129,8 +129,12 @@ constructor(
      * Resolves the direct stream URL for [mediaId], caching the player response and the
      * resolved URL so repeat calls (playback + download) are cheap.
      * Used by both the playback data source and [LocalFileDownloader].
+     *
+     * @param preferAac when true (downloads), prefers AAC/m4a streams over Opus/webm
+     *                    for better external-player compatibility. Playback uses the default
+     *                    (Opus preferred, higher quality per bitrate).
      */
-    suspend fun resolveStreamUrl(mediaId: String): String {
+    suspend fun resolveStreamUrl(mediaId: String, preferAac: Boolean = false): String {
         songUrlCache[mediaId]?.takeIf { it.second > System.currentTimeMillis() }?.let {
             return it.first
         }
@@ -142,6 +146,7 @@ constructor(
             connectivityManager = connectivityManager,
             networkMetered = networkMeteredPref,
             avoidCodecs = avoidStreamCodecs,
+            preferAac = preferAac,
         ).getOrThrow()
         val format = playbackData.format
 

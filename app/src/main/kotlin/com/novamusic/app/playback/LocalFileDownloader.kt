@@ -116,7 +116,11 @@ constructor(
         onProgress?.invoke(queued)
         try {
             val streamUrl = try {
-                downloadUtil.resolveStreamUrl(songId)
+                // Downloads prefer AAC/m4a streams when the source offers them;
+                // Opus/webm is only used as a fallback. AAC plays in any external
+                // player and Android's own media stack, avoiding webm/Opus
+                // compatibility issues after the download completes.
+                downloadUtil.resolveStreamUrl(songId, preferAac = true)
             } catch (e: Exception) {
                 val reason = when {
                     e.message?.contains("timed out", ignoreCase = true) == true ->
@@ -314,8 +318,19 @@ constructor(
                     _progress.update { map -> map + (songId to completed) }
                     onProgress?.invoke(completed)
                 } catch (e: Exception) {
-                    // Roll back the pending MediaStore entry on failure/cancellation.
+                    // Roll back on failure/cancellation so a failed download never leaves
+                    // a trace: delete the MediaStore entry (partial/unfinalized file) AND
+                    // reset the Room isLocal/localPath flags if they were already written
+                    // (e.g. the final COMPLETED emission throws after the DB upsert).
                     runCatching { context.contentResolver.delete(uri, null, null) }
+                    runCatching {
+                        database.query {
+                            val current = getSongByIdBlocking(songId)?.song ?: return@query
+                            if (current.isLocal) {
+                                update(current.copy(isLocal = false, localPath = null))
+                            }
+                        }
+                    }
                     throw e
                 }
             }

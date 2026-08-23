@@ -57,7 +57,7 @@ class CachePlaylistViewModel @Inject constructor(
                 val completeSongs = songs.filter {
                     val contentLength = it.format?.contentLength
                     contentLength != null && playerCache.isCached(it.song.id, 0, contentLength)
-                }
+                }.filterNot { it.song.isLocal } // Exclude app-downloaded songs (they live in Downloaded)
 
                 if (completeSongs.isNotEmpty()) {
                     database.query {

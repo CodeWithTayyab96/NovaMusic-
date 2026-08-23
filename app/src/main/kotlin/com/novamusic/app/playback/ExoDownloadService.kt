@@ -118,7 +118,7 @@ class ExoDownloadService : DownloadService(
         val builder = Notification.Builder.recoverBuilder(
             this, notificationHelper.buildProgressNotification(
                 this,
-                R.drawable.downloading,
+                R.drawable.ic_music,
                 contentIntent,
                 title,
                 downloads,
@@ -207,7 +207,7 @@ class ExoDownloadService : DownloadService(
             if (download.state == Download.STATE_FAILED) {
                 val notification = notificationHelper.buildDownloadFailedNotification(
                     context,
-                    R.drawable.error,
+                    R.drawable.ic_music,
                     null,
                     Util.fromUtf8Bytes(download.request.data)
                 )

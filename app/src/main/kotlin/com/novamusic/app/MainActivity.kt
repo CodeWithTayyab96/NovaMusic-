@@ -1360,9 +1360,9 @@ class MainActivity : ComponentActivity() {
                                                             contentAlignment = Alignment.Center
                                                         ) {
                                                             Icon(
-                                                                painter = painterResource(R.drawable.opentune),
+                                                                painter = painterResource(R.drawable.ic_novamusic_glyph),
                                                                 contentDescription = null,
-                                                                tint = Color.Unspecified,
+                                                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
                                                                 modifier = Modifier.size(28.dp)
                                                             )
                                                         }

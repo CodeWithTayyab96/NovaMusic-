@@ -83,7 +83,7 @@ object DownloadNotificationManager {
                 context.getString(R.string.download_progress_percent, state.title, progress)
             }
         return NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.downloading)
+            .setSmallIcon(R.drawable.ic_music)
             .setContentTitle(title)
             .setContentText(state.artist.ifBlank { context.getString(R.string.downloading) })
             .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -116,7 +116,7 @@ object DownloadNotificationManager {
             }
         val progress = (overall * 100).toInt().coerceIn(0, 100)
         return NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.downloading)
+            .setSmallIcon(R.drawable.ic_music)
             .setContentTitle(
                 context.resources.getQuantityString(
                     R.plurals.downloading_n_songs,
@@ -190,7 +190,7 @@ object DownloadNotificationManager {
         } ?: context.getString(R.string.download_paused)
         val notification =
             NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.drawable.downloading)
+                .setSmallIcon(R.drawable.ic_music)
                 .setContentTitle(title)
                 .setContentText(contentText)
                 .setSubText(artist.ifBlank { null })
@@ -220,7 +220,7 @@ object DownloadNotificationManager {
     fun showCompleted(context: Context, title: String) {
         val notification =
             NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.drawable.download)
+                .setSmallIcon(R.drawable.ic_music)
                 .setContentTitle(title)
                 .setContentText(context.getString(R.string.download_complete))
                 .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -245,7 +245,7 @@ object DownloadNotificationManager {
         }
         val notification =
             NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.drawable.error)
+                .setSmallIcon(R.drawable.ic_music)
                 .setContentTitle(title)
                 .setContentText(contentText)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(contentText))
