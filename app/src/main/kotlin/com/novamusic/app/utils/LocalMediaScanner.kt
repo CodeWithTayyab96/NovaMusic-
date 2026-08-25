@@ -6,6 +6,7 @@
 
 package com.novamusic.app.utils
 
+import android.os.Build
 import android.content.ContentUris
 import android.content.Context
 import android.media.MediaMetadataRetriever
@@ -53,15 +54,29 @@ private val NON_MUSIC_DIR_PATHS = setOf(
     "/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Audio",
 )
 
-/** Returns true when [filePath] looks like a non-music audio file (voice note, ringtone,
- *  notification sound, etc.) based on path patterns and filename conventions. */
-private fun isNonMusicAudioFile(filePath: String, @Suppress("UNUSED_PARAMETER") title: String?): Boolean {
-    // Check WhatsApp voice note filename pattern (e.g. AUD-20260706-WA0013)
-    val name = filePath.substringAfterLast('/')
-    if (WHATSAPP_VOICE_NOTE_PATTERN.containsMatchIn(name)) return true
+/** Returns true when the file/path/title looks like non-music audio (voice note, ringtone, etc.). */
+private fun isNonMusicAudioFile(
+    filePath: String?,
+    relativePath: String?,
+    displayName: String?,
+    title: String?,
+): Boolean {
+    // Check WhatsApp/voice note filename patterns (e.g. AUD-20260706-WA0013, PTT-*, voice-*)
+    val nameCandidates = listOfNotNull(
+        displayName,
+        filePath?.substringAfterLast('/'),
+        title,
+    )
+    if (nameCandidates.any { WHATSAPP_VOICE_NOTE_PATTERN.containsMatchIn(it) }) return true
 
-    // Check for known non-music directories in the path
-    if (NON_MUSIC_DIR_PATHS.any { dir -> filePath.contains(dir, ignoreCase = true) }) return true
+    // Check for known non-music directories in path candidates (DATA column or RELATIVE_PATH column)
+    val pathCandidates = listOfNotNull(
+        filePath,
+        relativePath?.let { if (it.startsWith("/")) it else "/$it" },
+    )
+    if (pathCandidates.any { path ->
+        NON_MUSIC_DIR_PATHS.any { dir -> path.contains(dir, ignoreCase = true) }
+    }) return true
 
     return false
 }
@@ -77,7 +92,7 @@ private val ALBUM_ART_URI = Uri.parse("content://media/external/audio/albumart")
 object LocalMediaScanner {
 
     suspend fun scan(context: Context, database: MusicDatabase): Int = withContext(Dispatchers.IO) {
-        val projection = arrayOf(
+        val projection = mutableListOf(
             MediaStore.Audio.Media._ID,
             MediaStore.Audio.Media.TITLE,
             MediaStore.Audio.Media.ARTIST,
@@ -87,8 +102,14 @@ object LocalMediaScanner {
             MediaStore.Audio.Media.YEAR,
             MediaStore.Audio.Media.DURATION,
             MediaStore.Audio.Media.DATE_MODIFIED,
-            MediaStore.Audio.Media.DATA, // Ruta del archivo
-        )
+            MediaStore.Audio.Media.DATA,
+            MediaStore.Audio.Media.DISPLAY_NAME,
+        ).apply {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                add(MediaStore.Audio.Media.RELATIVE_PATH)
+            }
+        }.toTypedArray()
+
         // Combine IS_MUSIC flag with a minimum duration filter. IS_MUSIC is unreliable
         // on some OEM ROMs (WhatsApp voice notes, Telegram voice messages, etc. can be
         // flagged IS_MUSIC=1), so we also apply code-level path/pattern exclusions below.
@@ -96,6 +117,7 @@ object LocalMediaScanner {
             "${MediaStore.Audio.Media.DURATION} > ?"
 
         var count = 0
+        val validScannedSongIds = mutableSetOf<String>()
         // 30 seconds in milliseconds — below this, files are almost certainly voice notes,
         // ringtones, or notification sounds, not music.
         val selectionArgs = arrayOf(MIN_DURATION_MS.toString())
@@ -115,7 +137,13 @@ object LocalMediaScanner {
             val yearCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.YEAR)
             val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
             val dateModifiedCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_MODIFIED)
-            val dataCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
+            val dataCol = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
+            val displayNameCol = cursor.getColumnIndex(MediaStore.Audio.Media.DISPLAY_NAME)
+            val relativePathCol = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                cursor.getColumnIndex(MediaStore.Audio.Media.RELATIVE_PATH)
+            } else {
+                -1
+            }
 
             while (cursor.moveToNext()) {
                 val mediaStoreId = cursor.getLong(idCol)
@@ -132,12 +160,14 @@ object LocalMediaScanner {
                 val thumbnailUrl = ContentUris.withAppendedId(ALBUM_ART_URI, albumId).toString()
                 val durationMs = cursor.getLong(durationCol)
                 val dateModifiedSec = cursor.getLong(dateModifiedCol)
-                val filePath = cursor.getString(dataCol)
+                val filePath = if (dataCol >= 0) cursor.getString(dataCol) else null
+                val displayName = if (displayNameCol >= 0) cursor.getString(displayNameCol) else null
+                val relativePath = if (relativePathCol >= 0) cursor.getString(relativePathCol) else null
 
                 // Exclude WhatsApp/Telegram voice notes and similar non-music audio.
                 // The IS_MUSIC flag is unreliable on many OEM ROMs and these apps often
                 // set it on their voice notes. Filter by path pattern and filename.
-                if (!filePath.isNullOrBlank() && isNonMusicAudioFile(filePath, storeTitle)) {
+                if (isNonMusicAudioFile(filePath, relativePath, displayName, storeTitle)) {
                     continue
                 }
 
@@ -184,9 +214,35 @@ object LocalMediaScanner {
                     now = now,
                 )
 
+                validScannedSongIds.add(songId)
                 count++
             }
         }
+
+        // Purge local-song rows previously indexed in DB that no longer pass the filter
+        // (e.g. voice notes previously stored before path filtering, deleted files, or duration < 30s)
+        database.withTransaction {
+            val existingLocalSongs = database.getLocalSongsBlocking()
+            existingLocalSongs.forEach { songEntity ->
+                val isScannedLocal = songEntity.id.startsWith(LOCAL_SONG_ID_PREFIX)
+                val failsNonMusicFilter = isNonMusicAudioFile(
+                    filePath = songEntity.localPath,
+                    relativePath = null,
+                    displayName = songEntity.title,
+                    title = songEntity.title,
+                )
+                val failsDuration = songEntity.duration in 1..29
+
+                val shouldPurge = (isScannedLocal && songEntity.id !in validScannedSongIds) ||
+                    failsNonMusicFilter ||
+                    failsDuration
+
+                if (shouldPurge) {
+                    database.delete(songEntity)
+                }
+            }
+        }
+
         count
     }
 
