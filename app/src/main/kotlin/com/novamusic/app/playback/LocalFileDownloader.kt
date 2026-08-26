@@ -544,9 +544,10 @@ constructor(
     }
 
     private fun isPlausibleAudioContentType(contentMime: String, expectedMime: String?): Boolean {
-        if (contentMime.isEmpty()) return true // no header — nothing to judge, fall back to expected
+        if (contentMime.isEmpty()) return true
         if (contentMime.startsWith("audio/")) return true
-        // Definite error-page / non-audio payloads.
+        if (contentMime.startsWith("video/")) return true // YouTube audio-only streams are served under video/webm or video/mp4
+        if (contentMime == "application/octet-stream") return true
         if (
             contentMime.startsWith("text/") ||
             contentMime.startsWith("image/") ||
@@ -558,41 +559,17 @@ constructor(
         }
         val expected = expectedMime?.lowercase()
         if (expected != null && expected.startsWith("audio/")) {
-            // CDNs sometimes label audio-only webm/mp4 streams as video/* or octet-stream.
-            if (contentMime.startsWith("video/")) return true
-            if (contentMime == "application/octet-stream") return true
-            return contentMime == expected
+            return true
         }
-        return false
+        return true
     }
 
     /**
-     * Identifies the audio container from the stream's leading magic bytes. Returns a
-     * human-readable container name, or null when the payload isn't a known audio
-     * container (error page, garbage, empty file).
+     * Identifies the audio container from the stream's leading magic bytes. Reads up to 512
+     * bytes in a loop to handle streams that return small chunks or use non-zero box offsets.
+     * Returns a human-readable container name, or null when the payload isn't a known audio container.
      */
-    private fun detectContainer(input: InputStream): String? {
-        val header = ByteArray(16)
-        val n = input.read(header)
-        if (n < 4) return null
-        fun ascii(offset: Int, text: String): Boolean {
-            val signature = text.toByteArray(Charsets.US_ASCII)
-            if (offset + signature.size > n) return false
-            return signature.indices.all { i -> header[offset + i] == signature[i] }
-        }
-        return when {
-            ascii(0, "ID3") -> "MP3 (ID3)"
-            ascii(0, "fLaC") -> "FLAC"
-            ascii(0, "OggS") -> "Ogg (Opus/Vorbis)"
-            ascii(0, "RIFF") -> "WAV"
-            ascii(0, "FORM") -> "AIFF"
-            ascii(4, "ftyp") -> "MP4/M4A"
-            header[0] == 0x1A.toByte() && header[1] == 0x45.toByte() &&
-                header[2] == 0xDF.toByte() && header[3] == 0xA3.toByte() -> "WebM/EBML"
-            header[0] == 0xFF.toByte() && (header[1].toInt() and 0xE0) == 0xE0 -> "MP3 (MPEG sync)"
-            else -> null
-        }
-    }
+
 
     /** Cheap magic-byte check: true when the stream looks like a known audio container. */
     private fun sniffAudioHeader(input: InputStream): Boolean = detectContainer(input) != null
@@ -726,6 +703,80 @@ internal fun storeMimeForContainer(
             else -> "audio/mp4"
         }
     }
+}
+
+internal fun detectContainer(input: InputStream): String? {
+    val header = ByteArray(512)
+    var totalRead = 0
+    while (totalRead < header.size) {
+        val bytesRead = input.read(header, totalRead, header.size - totalRead)
+        if (bytesRead <= 0) break
+        totalRead += bytesRead
+    }
+    if (totalRead < 4) return null
+
+    fun hasAscii(offset: Int, text: String): Boolean {
+        val sig = text.toByteArray(Charsets.US_ASCII)
+        if (offset + sig.size > totalRead) return false
+        return sig.indices.all { i -> header[offset + i] == sig[i] }
+    }
+
+    fun findAscii(text: String, maxSearch: Int = totalRead): Int {
+        val sig = text.toByteArray(Charsets.US_ASCII)
+        if (sig.size > totalRead) return -1
+        val limit = (maxSearch - sig.size).coerceAtMost(totalRead - sig.size)
+        for (i in 0..limit) {
+            if (sig.indices.all { j -> header[i + j] == sig[j] }) return i
+        }
+        return -1
+    }
+
+    // Check for WebM/EBML magic: 0x1A 0x45 0xDF 0xA3 in first 64 bytes
+    for (i in 0..(totalRead - 4).coerceAtMost(60)) {
+        if (header[i] == 0x1A.toByte() &&
+            header[i + 1] == 0x45.toByte() &&
+            header[i + 2] == 0xDF.toByte() &&
+            header[i + 3] == 0xA3.toByte()
+        ) {
+            return "WebM/EBML"
+        }
+    }
+
+    // Check for Ogg container: "OggS" in first 64 bytes
+    if (findAscii("OggS", 64) != -1) return "Ogg (Opus/Vorbis)"
+
+    // Check for FLAC container: "fLaC" in first 64 bytes
+    if (findAscii("fLaC", 64) != -1) return "FLAC"
+
+    // Check for MP3 ID3 header
+    if (hasAscii(0, "ID3") || findAscii("ID3", 32) != -1) return "MP3 (ID3)"
+
+    // Check for WAV or AIFF
+    if (findAscii("RIFF", 16) != -1) return "WAV"
+    if (findAscii("FORM", 16) != -1) return "AIFF"
+
+    // Check for MP4/M4A / ISOBMFF boxes anywhere in first 256 bytes
+    // Common MP4 boxes: "ftyp", "styp", "moof", "sidx", "mdat", "free", "skip", "wide"
+    val mp4Boxes = listOf("ftyp", "styp", "moof", "sidx", "mdat", "free", "skip", "wide")
+    for (box in mp4Boxes) {
+        if (findAscii(box, 256) != -1) {
+            return "MP4/M4A"
+        }
+    }
+
+    // Check for AAC ADTS or MPEG audio frame sync
+    for (i in 0..(totalRead - 2).coerceAtMost(256)) {
+        val b0 = header[i].toInt() and 0xFF
+        val b1 = header[i + 1].toInt() and 0xFF
+        if (b0 == 0xFF) {
+            // AAC ADTS frame sync: 12 bits of 1s (0xFF 0xF0..0xFF 0xF9)
+            if ((b1 and 0xF6) == 0xF0) return "AAC (ADTS)"
+            // MPEG audio frame sync: 11 bits of 1s (0xFF 0xE0..0xFF 0xFF)
+            if ((b1 and 0xE0) == 0xE0) return "MP3 (MPEG sync)"
+        }
+    }
+
+    return null
 }
 
 

@@ -2,10 +2,10 @@ package com.novamusic.app.playback
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.io.ByteArrayInputStream
 
 /**
- * Unit tests verifying that [storeMimeForContainer] maps audio/webm streams to
- * audio/x-matroska for MediaStore insertion, avoiding the OEM Unsupported MIME type error.
+ * Unit tests verifying [storeMimeForContainer] and [detectContainer] in LocalFileDownloader.
  */
 class LocalFileDownloaderMimeTest {
 
@@ -31,5 +31,26 @@ class LocalFileDownloaderMimeTest {
         assertEquals("audio/mpeg", storeMimeForContainer("audio/mpeg", null, "mp3"))
         assertEquals("audio/flac", storeMimeForContainer("audio/flac", null, "flac"))
         assertEquals("audio/ogg", storeMimeForContainer("audio/ogg", null, "ogg"))
+    }
+
+    @Test
+    fun detectContainer_identifiesMp4FtypAndStyp() {
+        val mp4Bytes = byteArrayOf(0, 0, 0, 32, 'f'.code.toByte(), 't'.code.toByte(), 'y'.code.toByte(), 'p'.code.toByte(), 'M'.code.toByte(), '4'.code.toByte(), 'A'.code.toByte(), ' '.code.toByte())
+        val detected = detectContainer(ByteArrayInputStream(mp4Bytes))
+        assertEquals("MP4/M4A", detected)
+    }
+
+    @Test
+    fun detectContainer_identifiesWebmEbmlHeader() {
+        val webmBytes = byteArrayOf(0x1A.toByte(), 0x45.toByte(), 0xDF.toByte(), 0xA3.toByte(), 0x01, 0x00, 0x00)
+        val detected = detectContainer(ByteArrayInputStream(webmBytes))
+        assertEquals("WebM/EBML", detected)
+    }
+
+    @Test
+    fun detectContainer_identifiesAdtsAac() {
+        val aacBytes = byteArrayOf(0xFF.toByte(), 0xF1.toByte(), 0x50.toByte(), 0x80.toByte(), 0x00)
+        val detected = detectContainer(ByteArrayInputStream(aacBytes))
+        assertEquals("AAC (ADTS)", detected)
     }
 }
