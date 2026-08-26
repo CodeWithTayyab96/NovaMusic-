@@ -198,12 +198,9 @@ constructor(
                     ?: contentMime
                 val extension = extensionForMime(containerMime)
                 // MediaStore MIME_TYPE: keep a real audio/* value even when the CDN labels an
-                // audio-only stream as video/* or octet-stream.
-                val storeMime = when {
-                    containerMime.startsWith("audio/") -> containerMime
-                    expectedMime?.startsWith("audio/") == true -> expectedMime
-                    else -> mimeForExtension(extension)
-                }
+                // audio-only stream as video/* or octet-stream. Map audio/webm to audio/x-matroska
+                // for MediaStore insertion since OEM MediaProviders reject audio/webm in Audio.Media.
+                val storeMime = storeMimeForContainer(containerMime, expectedMime, extension)
 
                 val displayName =
                     "${sanitizeFileName(safeTitle)} - ${sanitizeFileName(artist)}.$extension"
@@ -630,8 +627,8 @@ constructor(
     }
 
     /** Maps a file extension back to a sensible audio MIME type for MediaStore. */
-    private fun mimeForExtension(extension: String): String = when (extension) {
-        "webm" -> "audio/webm"
+    internal fun mimeForExtension(extension: String): String = when (extension) {
+        "webm" -> "audio/x-matroska"
         "ogg" -> "audio/ogg"
         "flac" -> "audio/flac"
         "wav" -> "audio/wav"
@@ -706,3 +703,29 @@ internal fun extensionForMime(mime: String): String {
         else -> "m4a"
     }
 }
+
+internal fun storeMimeForContainer(
+    containerMime: String,
+    expectedMime: String?,
+    extension: String
+): String {
+    val cleanContainer = containerMime.substringBefore(';').trim().lowercase()
+    val cleanExpected = expectedMime?.substringBefore(';')?.trim()?.lowercase()
+    return when {
+        cleanContainer.contains("webm") -> "audio/x-matroska"
+        cleanContainer.startsWith("audio/") -> cleanContainer
+        cleanExpected?.contains("webm") == true -> "audio/x-matroska"
+        cleanExpected?.startsWith("audio/") == true -> cleanExpected
+        else -> when (extension) {
+            "webm" -> "audio/x-matroska"
+            "ogg" -> "audio/ogg"
+            "flac" -> "audio/flac"
+            "wav" -> "audio/wav"
+            "aac" -> "audio/aac"
+            "mp3" -> "audio/mpeg"
+            else -> "audio/mp4"
+        }
+    }
+}
+
+
