@@ -100,7 +100,7 @@ fun SettingsProfileHeader(modifier: Modifier = Modifier) {
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.opentune),
+                        painter = painterResource(R.drawable.ic_novamusic_glyph),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(SettingsDimensions.HeroIconInnerSize),

@@ -327,9 +327,10 @@ private fun MiniPlayerArtwork(
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
-                Image(
-                    painter = painterResource(R.drawable.opentune),
+                Icon(
+                    painter = painterResource(R.drawable.ic_novamusic_glyph),
                     contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(22.dp)
                 )
             }

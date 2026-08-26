@@ -152,7 +152,7 @@ object UpdateNotificationManager {
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.opentune_monochrome)
+            .setSmallIcon(R.drawable.ic_music)
             .setContentTitle(context.getString(R.string.update_notification_title))
             .setContentText(context.getString(R.string.update_notification_text, newVersion))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)

@@ -383,7 +383,7 @@ private fun HeroCardExpressive(shimmerBrush: Brush) {
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Image(
-                            painter = painterResource(R.drawable.opentune_monochrome),
+                            painter = painterResource(R.drawable.ic_novamusic_glyph),
                             contentDescription = null,
                             colorFilter = ColorFilter.tint(
                                 MaterialTheme.colorScheme.onPrimaryContainer,

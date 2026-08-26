@@ -98,7 +98,7 @@ internal fun LyricsBrandingRow(
             contentAlignment = Alignment.Center,
         ) {
             Image(
-                painter = painterResource(R.drawable.opentune),
+                painter = painterResource(R.drawable.ic_novamusic_glyph),
                 contentDescription = null,
                 modifier = Modifier.size(15.dp),
                 colorFilter = ColorFilter.tint(

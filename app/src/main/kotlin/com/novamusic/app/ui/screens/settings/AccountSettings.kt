@@ -356,8 +356,9 @@ private fun AccountSettingsHeader(onClose: () -> Unit) {
             ) {
                 // App Icon
                 Icon(
-                    painter = painterResource(R.drawable.opentune),
+                    painter = painterResource(R.drawable.ic_novamusic_glyph),
                     contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier
                         .size(44.dp)
                 )
