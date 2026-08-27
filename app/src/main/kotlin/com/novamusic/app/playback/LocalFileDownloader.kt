@@ -115,11 +115,7 @@ constructor(
         _progress.update { map -> map + (songId to queued) }
         onProgress?.invoke(queued)
         try {
-            val streamUrl = try {
-                // Downloads prefer AAC/m4a streams when the source offers them;
-                // Opus/webm is only used as a fallback. AAC plays in any external
-                // player and Android's own media stack, avoiding webm/Opus
-                // compatibility issues after the download completes.
+            var currentStreamUrl = try {
                 downloadUtil.resolveStreamUrl(songId, preferAac = true)
             } catch (e: Exception) {
                 val reason = when {
@@ -149,47 +145,56 @@ constructor(
             _progress.update { map -> map + (songId to downloading) }
             onProgress?.invoke(downloading)
 
-            val request = Request.Builder().url(streamUrl).build()
-            downloadUtil.mediaOkHttpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
+            // Make initial probe request to inspect headers & total content length
+            var initialRequest = Request.Builder()
+                .url(currentStreamUrl)
+                .header("Range", "bytes=0-")
+                .build()
+
+            var response = downloadUtil.mediaOkHttpClient.newCall(initialRequest).execute()
+            if (response.code == 403) {
+                // If URL expired or 403 returned, invalidate cache and re-resolve stream URL once
+                response.close()
+                com.novamusic.app.utils.YTPlayerUtils.invalidateCachedStreamUrls(songId)
+                currentStreamUrl = downloadUtil.resolveStreamUrl(songId, preferAac = true)
+                initialRequest = Request.Builder()
+                    .url(currentStreamUrl)
+                    .header("Range", "bytes=0-")
+                    .build()
+                response = downloadUtil.mediaOkHttpClient.newCall(initialRequest).execute()
+            }
+
+            response.use { initialResp ->
+                if (!initialResp.isSuccessful && initialResp.code != 206) {
                     throw IOException(
-                        "HTTP ${response.code} while downloading $songId " +
-                            "(Content-Type: ${response.header("Content-Type") ?: "unknown"})",
+                        "HTTP ${initialResp.code} while downloading $songId " +
+                            "(Content-Type: ${initialResp.header("Content-Type") ?: "unknown"})",
                     )
                 }
-                val body = response.body ?: throw IOException("Empty response body for $songId")
-                val contentLength = body.contentLength()
 
-                // Validate the response is actually audio before writing anything to disk.
-                // YouTube's CDN can answer 200 with an HTML/JSON error page instead of the
-                // stream (expired URL, rejected client, bot check); saving that as a .m4a
-                // is what produced the "None of the available extractors could read the
-                // stream" corrupt files.
-                val rawContentType = response.header("Content-Type") ?: ""
+                val body = initialResp.body ?: throw IOException("Empty response body for $songId")
+                
+                // Determine Content-Length from Content-Range or Content-Length header
+                val contentRangeHeader = initialResp.header("Content-Range")
+                val totalLengthFromRange = contentRangeHeader?.substringAfter('/')?.trim()?.toLongOrNull()
+                val contentLength = totalLengthFromRange ?: body.contentLength()
+
+                val rawContentType = initialResp.header("Content-Type") ?: ""
                 val contentMime = rawContentType.substringBefore(';').trim().lowercase()
-                // resolveStreamUrl persists the chosen format on the query executor
-                // fire-and-forget, so drain it before reading the expected mime back.
+
                 val expectedMime = runCatching {
                     database.awaitIdle()
                     database.format(songId).first()?.mimeType
                 }.getOrNull()
+
                 if (!isPlausibleAudioContentType(contentMime, expectedMime)) {
                     val detail =
-                        "HTTP ${response.code} | Content-Type: \"$rawContentType\" | " +
+                        "HTTP ${initialResp.code} | Content-Type: \"$rawContentType\" | " +
                             "expected audio, got non-audio (known format: ${expectedMime ?: "unknown"})"
                     Log.e(TAG, "Refusing to save non-audio response for $songId: $detail")
                     throw IOException("Non-audio response for $songId: $detail")
                 }
-                if (contentLength == 0L) {
-                    val detail = "HTTP ${response.code} | Content-Type: \"$rawContentType\" | empty body"
-                    Log.e(TAG, "Empty download response for $songId: $detail")
-                    throw IOException("Empty download response for $songId: $detail")
-                }
 
-                // The resolved format's mimeType (e.g. "audio/webm", "audio/mp4") is the
-                // authoritative container for the stream we selected; the CDN's Content-Type
-                // header can be missing or mislabeled (video/webm, application/octet-stream)
-                // for audio-only streams, so prefer it when deciding the container/extension.
                 val containerMime = expectedMime
                     ?.substringBefore(';')
                     ?.trim()
@@ -197,9 +202,6 @@ constructor(
                     ?.takeIf { it.isNotBlank() }
                     ?: contentMime
                 val extension = extensionForMime(containerMime)
-                // MediaStore MIME_TYPE: keep a real audio/* value even when the CDN labels an
-                // audio-only stream as video/* or octet-stream. Map audio/webm to audio/x-matroska
-                // for MediaStore insertion since OEM MediaProviders reject audio/webm in Audio.Media.
                 val storeMime = storeMimeForContainer(containerMime, expectedMime, extension)
 
                 val displayName =
@@ -225,64 +227,102 @@ constructor(
 
                 try {
                     var bytesDownloaded = 0L
-                    context.contentResolver.openOutputStream(uri)?.use { output ->
-                        body.source().use { input ->
-                            val buffer = Buffer()
-                            // Progress throttling: updating _progress copies the whole map and
-                            // triggers recomposition across every screen observing it. Firing on
-                            // every 64KB buffer read (dozens of times per second) was the cause of
-                            // app-wide slowness during downloads. Emit at most every 250ms OR every
-                            // 2% progress change, whichever comes first. Terminal states below are
-                            // not throttled and always emit.
-                            var lastEmitAt = 0L
-                            var lastEmittedProgress = -1f
-                            while (true) {
-                                val read = input.read(buffer, BUFFER_SIZE)
-                                if (read == -1L) break
-                                buffer.copyTo(output, read)
-                                bytesDownloaded += read
-                                val p =
-                                    if (contentLength > 0) {
-                                        (bytesDownloaded.toFloat() / contentLength).coerceIn(0f, 1f)
-                                    } else {
-                                        0f
+                    var resumeAttempts = 0
+                    const val MAX_RESUME_ATTEMPTS = 5
+                    var lastEmitAt = 0L
+                    var lastEmittedProgress = -1f
+
+                    while (bytesDownloaded < contentLength || contentLength <= 0) {
+                        val mode = if (bytesDownloaded == 0L) "w" else "wa"
+                        val req = Request.Builder()
+                            .url(currentStreamUrl)
+                            .header("Range", "bytes=$bytesDownloaded-")
+                            .build()
+
+                        val callResp = try {
+                            downloadUtil.mediaOkHttpClient.newCall(req).execute()
+                        } catch (e: Exception) {
+                            if (resumeAttempts < MAX_RESUME_ATTEMPTS) {
+                                resumeAttempts++
+                                Log.w(TAG, "Stream interrupted for $songId at $bytesDownloaded bytes, retrying ($resumeAttempts/$MAX_RESUME_ATTEMPTS)...")
+                                Thread.sleep(500L)
+                                continue
+                            } else throw e
+                        }
+
+                        var chunkRead = 0L
+                        callResp.use { chunkResp ->
+                            if (chunkResp.code == 403 && resumeAttempts < MAX_RESUME_ATTEMPTS) {
+                                resumeAttempts++
+                                com.novamusic.app.utils.YTPlayerUtils.invalidateCachedStreamUrls(songId)
+                                currentStreamUrl = downloadUtil.resolveStreamUrl(songId, preferAac = true)
+                                return@use
+                            }
+                            if (!chunkResp.isSuccessful && chunkResp.code != 206) {
+                                throw IOException("HTTP ${chunkResp.code} while resuming download for $songId at $bytesDownloaded bytes")
+                            }
+
+                            val chunkBody = chunkResp.body ?: return@use
+                            context.contentResolver.openOutputStream(uri, mode)?.use { output ->
+                                chunkBody.source().use { input ->
+                                    val buffer = Buffer()
+                                    while (true) {
+                                        val read = input.read(buffer, BUFFER_SIZE)
+                                        if (read == -1L) break
+                                        buffer.copyTo(output, read)
+                                        bytesDownloaded += read
+                                        chunkRead += read
+
+                                        val p = if (contentLength > 0) {
+                                            (bytesDownloaded.toFloat() / contentLength).coerceIn(0f, 1f)
+                                        } else 0f
+
+                                        val now = SystemClock.elapsedRealtime()
+                                        val progressDelta = p - lastEmittedProgress
+                                        if (now - lastEmitAt >= PROGRESS_EMIT_INTERVAL_MS || progressDelta >= PROGRESS_EMIT_DELTA) {
+                                            lastEmitAt = now
+                                            lastEmittedProgress = p
+                                            val state = LocalDownloadState(
+                                                songId = songId,
+                                                title = safeTitle,
+                                                artist = artist,
+                                                state = LocalDownloadState.State.DOWNLOADING,
+                                                progress = p,
+                                                bytesDownloaded = bytesDownloaded,
+                                                totalBytes = contentLength,
+                                            )
+                                            _progress.update { map -> map + (songId to state) }
+                                            onProgress?.invoke(state)
+                                        }
                                     }
-                                val now = SystemClock.elapsedRealtime()
-                                val progressDelta = p - lastEmittedProgress
-                                if (now - lastEmitAt >= PROGRESS_EMIT_INTERVAL_MS || progressDelta >= PROGRESS_EMIT_DELTA) {
-                                    lastEmitAt = now
-                                    lastEmittedProgress = p
-                                    val state = LocalDownloadState(
-                                        songId = songId,
-                                        title = safeTitle,
-                                        artist = artist,
-                                        state = LocalDownloadState.State.DOWNLOADING,
-                                        progress = p,
-                                        bytesDownloaded = bytesDownloaded,
-                                        totalBytes = contentLength,
-                                    )
-                                    _progress.update { map -> map + (songId to state) }
-                                    onProgress?.invoke(state)
                                 }
                             }
                         }
-                    } ?: throw IOException("Failed to open output stream for $songId")
 
-                    // 1) Completeness check: a stream that ends early (or is cut off mid-transfer
-                    // by the CDN/proxy) yields a truncated file that plays inside ExoPlayer (which
-                    // sniffs and tolerates partial containers) but fails in strict external players
-                    // like VLC. Compare what we wrote against the promised Content-Length and fail
-                    // loudly instead of keeping a broken file. Unknown lengths (-1) can't be checked.
-                    if (contentLength > 0 && bytesDownloaded != contentLength) {
-                        throw IOException(
-                            "Download incomplete: got $bytesDownloaded of $contentLength bytes for $songId",
-                        )
+                        if (contentLength > 0 && bytesDownloaded >= contentLength) {
+                            break
+                        }
+
+                        if (chunkRead == 0L) {
+                            // No data was read in this chunk attempt
+                            if (contentLength > 0 && bytesDownloaded < contentLength) {
+                                if (resumeAttempts < MAX_RESUME_ATTEMPTS) {
+                                    resumeAttempts++
+                                    Thread.sleep(500L)
+                                    continue
+                                } else {
+                                    throw IOException("Download incomplete: got $bytesDownloaded of $contentLength bytes for $songId")
+                                }
+                            } else {
+                                break
+                            }
+                        }
                     }
 
-                    // 2) Container sanity check: confirm the bytes we saved actually start with a
-                    // known audio container magic and log the detected container so extension/container
-                    // mismatches (e.g. a WebM file saved as .m4a) are visible in logcat before
-                    // testing in an external player. Throws (and rolls back) on garbage payloads.
+                    if (contentLength > 0 && bytesDownloaded < contentLength) {
+                        throw IOException("Download incomplete: got $bytesDownloaded of $contentLength bytes for $songId")
+                    }
+
                     verifySavedContainer(uri, songId, extension)
 
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -315,10 +355,6 @@ constructor(
                     _progress.update { map -> map + (songId to completed) }
                     onProgress?.invoke(completed)
                 } catch (e: Exception) {
-                    // Roll back on failure/cancellation so a failed download never leaves
-                    // a trace: delete the MediaStore entry (partial/unfinalized file) AND
-                    // reset the Room isLocal/localPath flags if they were already written
-                    // (e.g. the final COMPLETED emission throws after the DB upsert).
                     runCatching { context.contentResolver.delete(uri, null, null) }
                     runCatching {
                         database.query {

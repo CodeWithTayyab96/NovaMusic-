@@ -10,6 +10,19 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.0.0] — 2026-08-27
+
+Major release featuring a completely overhauled and resilient download engine:
+
+### Download System Overhaul
+- **Resilient Chunked HTTP Ranged Streaming**: Re-engineered `LocalFileDownloader` with `Range: bytes=offset-` headers to prevent YouTube CDN connection cut-offs and socket dropouts.
+- **Auto-Resume & Retry Loop**: Added an automatic 5-attempt retry loop that seamlessly resumes interrupted stream downloads from the exact last downloaded byte offset.
+- **Dynamic 403 Stream URL Re-Resolution**: Implemented automatic cache invalidation and stream URL re-resolution when expired or 403 Forbidden errors occur mid-download.
+- **Hardened HTTP Network Client**: Added 30-second timeouts, keep-alive headers, and connection failure retry handling in `DownloadUtil`.
+- **Unit Testing**: Added tests verifying container magic byte detection (EBML/WebM, MP4/M4A, AAC ADTS, MP3, FLAC, OGG) and file extension mappings.
+
+---
+
 ## [1.0.0] — 2026-08-17
 
 Initial NovaMusic release — a rebranded, rebuilt fork of OpenTune 3.0.6.

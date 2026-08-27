@@ -53,4 +53,14 @@ class LocalFileDownloaderMimeTest {
         val detected = detectContainer(ByteArrayInputStream(aacBytes))
         assertEquals("AAC (ADTS)", detected)
     }
+
+    @Test
+    fun extensionForMime_returnsCorrectExtensions() {
+        assertEquals("webm", extensionForMime("audio/webm"))
+        assertEquals("m4a", extensionForMime("audio/mp4"))
+        assertEquals("m4a", extensionForMime("audio/m4a"))
+        assertEquals("mp3", extensionForMime("audio/mpeg"))
+        assertEquals("flac", extensionForMime("audio/flac"))
+        assertEquals("ogg", extensionForMime("audio/ogg"))
+    }
 }

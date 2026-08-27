@@ -69,6 +69,10 @@ constructor(
         OkHttpClient
             .Builder()
             .proxy(YouTube.streamProxy)
+            .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
             .followRedirects(true)
             .followSslRedirects(true)
             .addInterceptor { chain ->
@@ -88,7 +92,9 @@ constructor(
                 val userAgent = StreamClientUtils.resolveUserAgent(clientParam)
                 val originReferer = StreamClientUtils.resolveOriginReferer(clientParam)
 
-                val builder = request.newBuilder().header("User-Agent", userAgent)
+                val builder = request.newBuilder()
+                    .header("User-Agent", userAgent)
+                    .header("Connection", "keep-alive")
                 originReferer.origin?.let { builder.header("Origin", it) }
                 originReferer.referer?.let { builder.header("Referer", it) }
 
