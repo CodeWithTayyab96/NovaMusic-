@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Data extraction rules: exoplayer caches and the download folder are
+   excluded from cloud backup and device-to-device transfer.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude
+            domain="file"
+            path="./datastore" />
+        <exclude
+            domain="sharedpref"
+            path="secure_credentials" />
+        <exclude
+            domain="file"
+            path="./exoplayer" />
+        <exclude
+            domain="file"
+            path="./download" />
+        <exclude
+            domain="database"
+            path="exoplayer_internal.db" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude
+            domain="file"
+            path="./datastore" />
+        <exclude
+            domain="sharedpref"
+            path="secure_credentials" />
+        <exclude
+            domain="file"
+            path="./exoplayer" />
+        <exclude
+            domain="file"
+            path="./download" />
+        <exclude
+            domain="database"
+            path="exoplayer_internal.db" />
+    </device-transfer>
+</data-extraction-rules>
