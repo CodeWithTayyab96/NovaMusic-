@@ -7,6 +7,7 @@
 package com.novamusic.app.playback
 
 import android.content.Context
+import android.content.pm.ServiceInfo
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
@@ -61,6 +62,7 @@ class LocalFileDownloadWorker(
                 ForegroundInfo(
                     DownloadNotificationManager.songNotificationId(songId),
                     DownloadNotificationManager.buildProgressNotification(applicationContext, queued),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
                 ),
             )
 
@@ -169,6 +171,7 @@ class LocalFileDownloadWorker(
                     ForegroundInfo(
                         DownloadNotificationManager.songNotificationId(state.songId),
                         DownloadNotificationManager.buildProgressNotification(applicationContext, state),
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
                     ),
                 )
             }

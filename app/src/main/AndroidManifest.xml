@@ -189,6 +189,15 @@
             </intent-filter>
         </service>
 
+        <!-- WorkManager runs LocalFileDownloadWorker as a foreground worker and passes
+             FOREGROUND_SERVICE_TYPE_DATA_SYNC. On API 34+ the platform requires the
+             started service to declare that type in the manifest, and WorkManager's own
+             manifest declares none, so it is merged in here. -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
+
         <receiver
             android:name="androidx.media3.session.MediaButtonReceiver"
             android:exported="true">
