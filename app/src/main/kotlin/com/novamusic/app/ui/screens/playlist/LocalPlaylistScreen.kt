@@ -100,7 +100,6 @@ import androidx.compose.ui.zIndex
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import androidx.palette.graphics.Palette
 import coil3.compose.AsyncImage
@@ -112,7 +111,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.novamusic.app.LocalDatabase
-import com.novamusic.app.LocalDownloadUtil
 import com.novamusic.app.LocalFileDownloader
 import com.novamusic.app.playback.LocalFileDownloader as LocalFileDownloaderImpl
 import com.novamusic.app.LocalPlayerAwareWindowInsets
@@ -134,7 +132,6 @@ import com.novamusic.app.innertube.YouTube
 import com.novamusic.app.innertube.models.SongItem
 import com.novamusic.app.innertube.utils.completed
 import com.novamusic.app.models.toMediaMetadata
-import com.novamusic.app.playback.ExoDownloadService
 import com.novamusic.app.playback.queues.ListQueue
 import com.novamusic.app.playback.queues.LocalMixQueue
 import com.novamusic.app.ui.component.DefaultDialog
@@ -151,6 +148,7 @@ import com.novamusic.app.ui.menu.SongMenu
 import com.novamusic.app.ui.theme.PlayerColorExtractor
 import com.novamusic.app.ui.utils.ItemWrapper
 import com.novamusic.app.ui.utils.backToMain
+import com.novamusic.app.ui.utils.downloadStateFor
 import com.novamusic.app.ui.utils.formatCompactCount
 import com.novamusic.app.utils.makeTimeString
 import com.novamusic.app.utils.rememberEnumPreference
@@ -252,7 +250,8 @@ fun LocalPlaylistScreen(
         }
     }
 
-    val downloadUtil = LocalDownloadUtil.current
+    val downloader = LocalFileDownloader.current
+    val localDownloadStates by downloader.progress.collectAsStateWithLifecycle()
     var downloadState by remember { mutableStateOf(Download.STATE_STOPPED) }
 
     val editable: Boolean = playlist?.playlist?.isEditable == true
@@ -262,22 +261,10 @@ fun LocalPlaylistScreen(
             clear()
             addAll(songs)
         }
-        if (songs.isEmpty()) return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            downloadState =
-                if (songs.all { downloads[it.song.id]?.state == Download.STATE_COMPLETED }) {
-                    Download.STATE_COMPLETED
-                } else if (songs.all {
-                        downloads[it.song.id]?.state == Download.STATE_QUEUED ||
-                                downloads[it.song.id]?.state == Download.STATE_DOWNLOADING ||
-                                downloads[it.song.id]?.state == Download.STATE_COMPLETED
-                    }
-                ) {
-                    Download.STATE_DOWNLOADING
-                } else {
-                    Download.STATE_STOPPED
-                }
-        }
+    }
+
+    LaunchedEffect(songs, localDownloadStates) {
+        downloadState = downloadStateFor(songs, localDownloadStates)
     }
 
     var showEditDialog by remember { mutableStateOf(false) }
@@ -338,12 +325,9 @@ fun LocalPlaylistScreen(
                             }
                         }
                         songs.forEach { song ->
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.song.id,
-                                false
-                            )
+                            coroutineScope.launch(Dispatchers.IO) {
+                                downloader.deleteLocalFile(song.song.id)
+                            }
                         }
                     }
                 ) {
@@ -889,12 +873,9 @@ fun LocalPlaylistScreen(
                                                 }
                                                 Download.STATE_DOWNLOADING -> {
                                                     songs.forEach { song ->
-                                                        DownloadService.sendRemoveDownload(
-                                                            context,
-                                                            ExoDownloadService::class.java,
-                                                            song.song.id,
-                                                            false,
-                                                        )
+                                                        coroutineScope.launch(Dispatchers.IO) {
+                                                            downloader.deleteLocalFile(song.song.id)
+                                                        }
                                                     }
                                                 }
                                                 else -> {

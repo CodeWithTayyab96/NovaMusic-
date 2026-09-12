@@ -87,7 +87,6 @@ import androidx.compose.ui.util.fastForEachIndexed
 import androidx.compose.ui.zIndex
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import androidx.palette.graphics.Palette
 import coil3.compose.AsyncImage
@@ -108,7 +107,6 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import com.novamusic.app.LocalDatabase
-import com.novamusic.app.LocalDownloadUtil
 import com.novamusic.app.LocalFileDownloader
 import com.novamusic.app.playback.LocalFileDownloader as LocalFileDownloaderImpl
 import com.novamusic.app.LocalPlayerAwareWindowInsets
@@ -119,7 +117,6 @@ import com.novamusic.app.constants.DisableBlurKey
 import com.novamusic.app.constants.HideExplicitKey
 import com.novamusic.app.db.entities.Album
 import com.novamusic.app.extensions.togglePlayPause
-import com.novamusic.app.playback.ExoDownloadService
 import com.novamusic.app.playback.queues.LocalAlbumRadio
 import com.novamusic.app.ui.component.IconButton
 import com.novamusic.app.ui.component.LocalMenuState
@@ -136,6 +133,7 @@ import com.novamusic.app.ui.menu.SongMenu
 import com.novamusic.app.ui.menu.YouTubeAlbumMenu
 import com.novamusic.app.ui.theme.PlayerColorExtractor
 import com.novamusic.app.ui.utils.ItemWrapper
+import com.novamusic.app.ui.utils.downloadStateFor
 import com.novamusic.app.ui.utils.backToMain
 import com.novamusic.app.utils.makeTimeString
 import com.novamusic.app.utils.rememberPreference
@@ -439,27 +437,13 @@ fun AlbumScreen(
         }
     }
 
-    val downloadUtil = LocalDownloadUtil.current
+    val downloader = LocalFileDownloader.current
+    val localDownloadStates by downloader.progress.collectAsStateWithLifecycle()
     var downloadState by remember { mutableStateOf(Download.STATE_STOPPED) }
 
-    LaunchedEffect(albumWithSongs) {
-        val songs = albumWithSongs?.songs?.map { it.id }
-        if (songs.isNullOrEmpty()) return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            downloadState =
-                if (songs.all { downloads[it]?.state == Download.STATE_COMPLETED }) {
-                    Download.STATE_COMPLETED
-                } else if (songs.all {
-                        downloads[it]?.state == Download.STATE_QUEUED ||
-                                downloads[it]?.state == Download.STATE_DOWNLOADING ||
-                                downloads[it]?.state == Download.STATE_COMPLETED
-                    }
-                ) {
-                    Download.STATE_DOWNLOADING
-                } else {
-                    Download.STATE_STOPPED
-                }
-        }
+    LaunchedEffect(albumWithSongs, localDownloadStates) {
+        val songs = albumWithSongs?.songs ?: return@LaunchedEffect
+        downloadState = downloadStateFor(songs, localDownloadStates)
     }
 
     // State for LazyColumn to track scroll
@@ -855,24 +839,12 @@ fun AlbumScreen(
                             Surface(
                                 onClick = {
                                     when (downloadState) {
-                                        Download.STATE_COMPLETED -> {
-                                            albumWithSongs.songs.forEach { song ->
-                                                DownloadService.sendRemoveDownload(
-                                                    context,
-                                                    ExoDownloadService::class.java,
-                                                    song.id,
-                                                    false,
-                                                )
-                                            }
-                                        }
+                                        Download.STATE_COMPLETED,
                                         Download.STATE_DOWNLOADING -> {
                                             albumWithSongs.songs.forEach { song ->
-                                                DownloadService.sendRemoveDownload(
-                                                    context,
-                                                    ExoDownloadService::class.java,
-                                                    song.id,
-                                                    false,
-                                                )
+                                                scope.launch(Dispatchers.IO) {
+                                                    downloader.deleteLocalFile(song.id)
+                                                }
                                             }
                                         }
                                         else -> {

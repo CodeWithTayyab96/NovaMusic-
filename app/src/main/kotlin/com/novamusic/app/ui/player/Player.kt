@@ -127,7 +127,6 @@ import coil3.request.ImageRequest
 import coil3.request.allowHardware
 import coil3.toBitmap
 import com.novamusic.app.R
-import com.novamusic.app.LocalDownloadUtil
 import com.novamusic.app.LocalPlayerConnection
 import com.novamusic.app.constants.DarkModeKey
 import com.novamusic.app.constants.PlayerDesignStyle
@@ -505,9 +504,6 @@ fun BottomSheetPlayer(
     }.let { (tb, ib) ->
         if (playerDesignStyle == PlayerDesignStyle.V7) Pair(Color.White, Color.Black) else Pair(tb, ib)
     }
-
-    val download by LocalDownloadUtil.current.getDownload(mediaMetadata?.id ?: "")
-        .collectAsStateWithLifecycle(initialValue = null)
 
     val sleepTimerEnabled =
         remember(

@@ -54,6 +54,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
@@ -84,7 +85,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastSumBy
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import androidx.palette.graphics.Palette
 import coil3.compose.AsyncImage
@@ -93,8 +93,8 @@ import coil3.request.ImageRequest
 import coil3.request.allowHardware
 import coil3.toBitmap
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import com.novamusic.app.LocalDownloadUtil
 import com.novamusic.app.LocalFileDownloader
 import com.novamusic.app.playback.LocalFileDownloader as LocalFileDownloaderImpl
 import com.novamusic.app.LocalPlayerAwareWindowInsets
@@ -105,7 +105,6 @@ import com.novamusic.app.constants.MyTopFilter
 import com.novamusic.app.db.entities.Song
 import com.novamusic.app.extensions.toMediaItem
 import com.novamusic.app.extensions.togglePlayPause
-import com.novamusic.app.playback.ExoDownloadService
 import com.novamusic.app.playback.queues.ListQueue
 import com.novamusic.app.ui.component.DefaultDialog
 import com.novamusic.app.ui.component.DraggableScrollbar
@@ -119,6 +118,7 @@ import com.novamusic.app.ui.menu.SongMenu
 import com.novamusic.app.ui.theme.PlayerColorExtractor
 import com.novamusic.app.ui.utils.ItemWrapper
 import com.novamusic.app.ui.utils.backToMain
+import com.novamusic.app.ui.utils.downloadStateFor
 import com.novamusic.app.utils.makeTimeString
 import com.novamusic.app.utils.rememberPreference
 import com.novamusic.app.viewmodels.TopPlaylistViewModel
@@ -177,7 +177,9 @@ fun TopPlaylistScreen(
     val sortType by viewModel.topPeriod.collectAsStateWithLifecycle()
     val name = stringResource(R.string.my_top) + " $maxSize"
 
-    val downloadUtil = LocalDownloadUtil.current
+    val downloader = LocalFileDownloader.current
+    val localDownloadStates by downloader.progress.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
     var downloadState by remember { mutableStateOf(Download.STATE_STOPPED) }
 
     LaunchedEffect(songs) {
@@ -185,22 +187,11 @@ fun TopPlaylistScreen(
             clear()
             songs?.let { addAll(it) }
         }
-        if (songs?.isEmpty() == true) return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            downloadState =
-                if (songs?.all { downloads[it.song.id]?.state == Download.STATE_COMPLETED } == true) {
-                    Download.STATE_COMPLETED
-                } else if (songs?.all {
-                        downloads[it.song.id]?.state == Download.STATE_QUEUED ||
-                                downloads[it.song.id]?.state == Download.STATE_DOWNLOADING ||
-                                downloads[it.song.id]?.state == Download.STATE_COMPLETED
-                    } == true
-                ) {
-                    Download.STATE_DOWNLOADING
-                } else {
-                    Download.STATE_STOPPED
-                }
-        }
+    }
+
+    LaunchedEffect(songs, localDownloadStates) {
+        val current = songs ?: return@LaunchedEffect
+        downloadState = downloadStateFor(current, localDownloadStates)
     }
 
     var showRemoveDownloadDialog by remember { mutableStateOf(false) }
@@ -226,12 +217,9 @@ fun TopPlaylistScreen(
                     onClick = {
                         showRemoveDownloadDialog = false
                         songs!!.forEach { song ->
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.song.id,
-                                false,
-                            )
+                            scope.launch(Dispatchers.IO) {
+                                downloader.deleteLocalFile(song.song.id)
+                            }
                         }
                     },
                 ) {
@@ -552,12 +540,9 @@ fun TopPlaylistScreen(
                                                 }
                                                 Download.STATE_DOWNLOADING -> {
                                                     songs!!.forEach { song ->
-                                                        DownloadService.sendRemoveDownload(
-                                                            context,
-                                                            ExoDownloadService::class.java,
-                                                            song.song.id,
-                                                            false,
-                                                        )
+                                                        scope.launch(Dispatchers.IO) {
+                                                            downloader.deleteLocalFile(song.song.id)
+                                                        }
                                                     }
                                                 }
                                                 else -> {
