@@ -87,7 +87,7 @@ fun DiscordLoginScreen(navController: NavController) {
                 addJavascriptInterface(object {
                     @JavascriptInterface
                     fun onRetrieveToken(token: String) {
-                        Log.d("DiscordWebView", "Token: $token")
+                        Log.d("DiscordWebView", "Discord authentication token received")
                         scope.launch(Dispatchers.Main) { completeLogin(token) }
                     }
                 }, "Android")
