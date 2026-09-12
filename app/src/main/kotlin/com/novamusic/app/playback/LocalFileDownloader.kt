@@ -232,38 +232,43 @@ constructor(
                     var lastEmitAt = 0L
                     var lastEmittedProgress = -1f
 
-                    while (bytesDownloaded < contentLength || contentLength <= 0) {
-                        val mode = if (bytesDownloaded == 0L) "w" else "wa"
-                        val req = Request.Builder()
-                            .url(currentStreamUrl)
-                            .header("Range", "bytes=$bytesDownloaded-")
-                            .build()
+                    // The MediaStore output stream is opened ONCE and stays open for the whole
+                    // download. Re-opening it per chunk with mode "wa" does not append on
+                    // MediaStore (each chunk overwrote from byte 0), so only the final chunk
+                    // survived on disk and the container verification below rejected the file.
+                    // Every chunk now writes into this single stream; the Range/resume logic,
+                    // retries and progress reporting below are unchanged.
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        while (bytesDownloaded < contentLength || contentLength <= 0) {
+                            val req = Request.Builder()
+                                .url(currentStreamUrl)
+                                .header("Range", "bytes=$bytesDownloaded-")
+                                .build()
 
-                        val callResp = try {
-                            downloadUtil.mediaOkHttpClient.newCall(req).execute()
-                        } catch (e: Exception) {
-                            if (resumeAttempts < MAX_RESUME_ATTEMPTS) {
-                                resumeAttempts++
-                                Log.w(TAG, "Stream interrupted for $songId at $bytesDownloaded bytes, retrying ($resumeAttempts/$MAX_RESUME_ATTEMPTS)...")
-                                Thread.sleep(500L)
-                                continue
-                            } else throw e
-                        }
-
-                        var chunkRead = 0L
-                        callResp.use { chunkResp ->
-                            if (chunkResp.code == 403 && resumeAttempts < MAX_RESUME_ATTEMPTS) {
-                                resumeAttempts++
-                                com.novamusic.app.utils.YTPlayerUtils.invalidateCachedStreamUrls(songId)
-                                currentStreamUrl = downloadUtil.resolveStreamUrl(songId, preferAac = true)
-                                return@use
-                            }
-                            if (!chunkResp.isSuccessful && chunkResp.code != 206) {
-                                throw IOException("HTTP ${chunkResp.code} while resuming download for $songId at $bytesDownloaded bytes")
+                            val callResp = try {
+                                downloadUtil.mediaOkHttpClient.newCall(req).execute()
+                            } catch (e: Exception) {
+                                if (resumeAttempts < MAX_RESUME_ATTEMPTS) {
+                                    resumeAttempts++
+                                    Log.w(TAG, "Stream interrupted for $songId at $bytesDownloaded bytes, retrying ($resumeAttempts/$MAX_RESUME_ATTEMPTS)...")
+                                    Thread.sleep(500L)
+                                    continue
+                                } else throw e
                             }
 
-                            val chunkBody = chunkResp.body ?: return@use
-                            context.contentResolver.openOutputStream(uri, mode)?.use { output ->
+                            var chunkRead = 0L
+                            callResp.use { chunkResp ->
+                                if (chunkResp.code == 403 && resumeAttempts < MAX_RESUME_ATTEMPTS) {
+                                    resumeAttempts++
+                                    com.novamusic.app.utils.YTPlayerUtils.invalidateCachedStreamUrls(songId)
+                                    currentStreamUrl = downloadUtil.resolveStreamUrl(songId, preferAac = true)
+                                    return@use
+                                }
+                                if (!chunkResp.isSuccessful && chunkResp.code != 206) {
+                                    throw IOException("HTTP ${chunkResp.code} while resuming download for $songId at $bytesDownloaded bytes")
+                                }
+
+                                val chunkBody = chunkResp.body ?: return@use
                                 chunkBody.source().use { input ->
                                     val buffer = Buffer()
                                     while (true) {
@@ -297,24 +302,24 @@ constructor(
                                     }
                                 }
                             }
-                        }
 
-                        if (contentLength > 0 && bytesDownloaded >= contentLength) {
-                            break
-                        }
-
-                        if (chunkRead == 0L) {
-                            // No data was read in this chunk attempt
-                            if (contentLength > 0 && bytesDownloaded < contentLength) {
-                                if (resumeAttempts < MAX_RESUME_ATTEMPTS) {
-                                    resumeAttempts++
-                                    Thread.sleep(500L)
-                                    continue
-                                } else {
-                                    throw IOException("Download incomplete: got $bytesDownloaded of $contentLength bytes for $songId")
-                                }
-                            } else {
+                            if (contentLength > 0 && bytesDownloaded >= contentLength) {
                                 break
+                            }
+
+                            if (chunkRead == 0L) {
+                                // No data was read in this chunk attempt
+                                if (contentLength > 0 && bytesDownloaded < contentLength) {
+                                    if (resumeAttempts < MAX_RESUME_ATTEMPTS) {
+                                        resumeAttempts++
+                                        Thread.sleep(500L)
+                                        continue
+                                    } else {
+                                        throw IOException("Download incomplete: got $bytesDownloaded of $contentLength bytes for $songId")
+                                    }
+                                } else {
+                                    break
+                                }
                             }
                         }
                     }
@@ -322,6 +327,8 @@ constructor(
                     if (contentLength > 0 && bytesDownloaded < contentLength) {
                         throw IOException("Download incomplete: got $bytesDownloaded of $contentLength bytes for $songId")
                     }
+
+                    Log.i(TAG, "Downloaded $songId: wrote $bytesDownloaded of $contentLength bytes")
 
                     verifySavedContainer(uri, songId, extension)
 
