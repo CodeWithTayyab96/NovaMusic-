@@ -228,7 +228,7 @@ constructor(
                 try {
                     var bytesDownloaded = 0L
                     var resumeAttempts = 0
-                    const val MAX_RESUME_ATTEMPTS = 5
+                    val MAX_RESUME_ATTEMPTS = 5
                     var lastEmitAt = 0L
                     var lastEmittedProgress = -1f
 

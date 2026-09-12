@@ -264,7 +264,7 @@ fun LocalPlaylistScreen(
     }
 
     LaunchedEffect(songs, localDownloadStates) {
-        downloadState = downloadStateFor(songs, localDownloadStates)
+        downloadState = downloadStateFor(songs.map { it.song }, localDownloadStates)
     }
 
     var showEditDialog by remember { mutableStateOf(false) }
