@@ -740,6 +740,16 @@ class MainActivity : ComponentActivity() {
                         .isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
 
                     val navController = rememberNavController()
+                    // Keep the Activity-level reference in sync with the composition's
+                    // controller. This lateinit property was declared but NEVER assigned,
+                    // while the composition created its own local of the same name. Any
+                    // callback declared outside this scope therefore read the unassigned
+                    // property: tapping the Update button (navController.navigate(
+                    // "settings/update")) crashed with
+                    // "lateinit property navController has not been initialized".
+                    // Assigning here means the property is populated by the time any
+                    // onClick or deep link can run.
+                    this@MainActivity.navController = navController
                     val homeViewModel: HomeViewModel = hiltViewModel()
                     val accountImageUrl by homeViewModel.accountImageUrl.collectAsStateWithLifecycle()
                     val allLocalItems by homeViewModel.allLocalItems.collectAsStateWithLifecycle()
