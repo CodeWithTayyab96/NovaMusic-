@@ -352,8 +352,8 @@ object Updater {
         getLatestReleaseInfo().getOrThrow().body
     }
 
-    suspend fun getLatestReleaseInfo(): Result<ReleaseInfo> = runCatching {
-        val releases = getAllReleases().getOrThrow()
+    suspend fun getLatestReleaseInfo(forceRefresh: Boolean = false): Result<ReleaseInfo> = runCatching {
+        val releases = getAllReleases(forceRefresh = forceRefresh).getOrThrow()
         val latest = findLatestRelease(releases)
             ?: throw IllegalStateException("No releases found")
         lastCheckTime = System.currentTimeMillis()
@@ -368,16 +368,22 @@ object Updater {
      * Returns null when no strictly-newer release exists (including when the newest
      * published release is older than the installed build).
      */
-    suspend fun checkForUpdate(): Result<UpdateInfo?> =
+    /**
+     * @param forceRefresh true for a user-initiated check. Without this a manual
+     *   "check for updates" tap could answer from a cached release list up to six
+     *   hours old and report "Up to date" while a newer release already existed.
+     */
+    suspend fun checkForUpdate(forceRefresh: Boolean = false): Result<UpdateInfo?> =
         runCatching {
-            checkForUpdateStable(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)
+            checkForUpdateStable(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE, forceRefresh)
         }
 
     private suspend fun checkForUpdateStable(
         currentVersionName: String,
         currentVersionCode: Int,
+        forceRefresh: Boolean = false,
     ): UpdateInfo? {
-        val latest = getLatestReleaseInfo().getOrThrow()
+        val latest = getLatestReleaseInfo(forceRefresh).getOrThrow()
         val latestVersionName =
             preferredReleaseVersionNameOrNull(latest)
                 ?: latest.name.ifBlank { latest.tagName }
@@ -559,6 +565,11 @@ object Updater {
             }.getOrNull()
 
             if (networkResult == null) {
+                // A user-initiated check must never present stale cached data as
+                // "you are up to date" — if we could not reach GitHub, say so.
+                if (forceRefresh) {
+                    throw IllegalStateException("Could not reach GitHub to check for updates")
+                }
                 val fallback = cachedReleases
                 if (fallback != null) {
                     lastCheckTime = now
@@ -601,6 +612,11 @@ object Updater {
                 }
 
                 else -> {
+                    if (forceRefresh) {
+                        throw IllegalStateException(
+                            "GitHub returned HTTP ${networkResult.status.value} while checking for updates",
+                        )
+                    }
                     val fallback = cachedReleases
                     if (fallback != null) {
                         lastCheckTime = now

@@ -188,7 +188,8 @@ fun UpdateScreen(
         if (updateCheckState == UpdateCheckState.Loading) return
         coroutineScope.launch {
             updateCheckState = UpdateCheckState.Loading
-            Updater.checkForUpdate()
+            // Force a real network check: the cached release list can be up to 6h old.
+            Updater.checkForUpdate(forceRefresh = true)
                 .onSuccess { info ->
                     if (info == null) {
                         updateCheckState = UpdateCheckState.UpToDate
