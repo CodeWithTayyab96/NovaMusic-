@@ -2191,6 +2191,25 @@ fun PlayerControlsContent(
                 clipboardManager = clipboardManager,
                 context = context
             )
+
+            // Offline playback state. MusicService.onPlayerError() sets
+            // waitingForNetworkConnection when a stream fails because the network is gone,
+            // and deliberately leaves the player alone so it can resume automatically once
+            // connectivity returns. That state was never surfaced anywhere, so a dropped
+            // connection looked like the app had simply frozen. The message is
+            // informational only — recovery behaviour is untouched.
+            val waitingForNetwork by playerConnection.waitingForNetworkConnection
+                .collectAsStateWithLifecycle()
+            if (waitingForNetwork) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = stringResource(R.string.error_no_internet),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
 
         Spacer(modifier = Modifier.width(12.dp))

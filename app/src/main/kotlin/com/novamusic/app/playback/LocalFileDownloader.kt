@@ -534,17 +534,24 @@ constructor(
      * path cannot delete unrelated user media.
      */
     private fun deleteStoredFile(path: String) {
+        if (!isDeletableDownloadPath(path, FOLDER_NAME)) return
         runCatching {
-            val uri = Uri.parse(path)
-            if (uri.scheme == "content") {
+            if (path.startsWith("content://", ignoreCase = true)) {
                 // Removing the MediaStore row also removes the underlying file.
-                context.contentResolver.delete(uri, null, null)
+                context.contentResolver.delete(Uri.parse(path), null, null)
                 return@runCatching
             }
-            val filePath = if (uri.scheme == "file") uri.path.orEmpty() else path
-            if (filePath.isNotEmpty() && filePath.contains(FOLDER_NAME, ignoreCase = true)) {
-                val file = File(filePath)
-                if (file.exists()) file.delete()
+            val filePath =
+                if (path.startsWith("file://", ignoreCase = true)) {
+                    path.removePrefix("file://")
+                } else {
+                    path
+                }
+            val file = File(filePath)
+            if (file.exists() && !file.delete()) {
+                // Never fail silently: a surviving file is exactly the reported bug —
+                // the song left the list while the audio stayed on disk.
+                Log.w(TAG, "Failed to delete downloaded file: $filePath")
             }
         }
     }
@@ -912,4 +919,26 @@ internal fun detectContainer(input: InputStream): String? {
     return null
 }
 
-
+/**
+ * Whether [path] refers to something the app is allowed to delete.
+ *
+ * The stored localPath is normally the raw MediaStore DATA column, i.e. a plain
+ * filesystem path with NO URI scheme. Deletion used to branch on Uri.scheme and
+ * silently skip anything that was neither "content" nor "file", so scheme-less
+ * paths were never deleted. This predicate is deliberately pure string logic so it
+ * can be unit tested on the JVM without a device.
+ *
+ * Only paths inside our own download folder are accepted, so an unexpected or
+ * malformed path can never delete unrelated user media or the playback cache.
+ */
+internal fun isDeletableDownloadPath(path: String, folderName: String = "NovaMusic"): Boolean {
+    if (path.isBlank()) return false
+    if (path.startsWith("content://", ignoreCase = true)) return true
+    val filePath =
+        if (path.startsWith("file://", ignoreCase = true)) {
+            path.removePrefix("file://")
+        } else {
+            path
+        }
+    return filePath.isNotEmpty() && filePath.contains(folderName, ignoreCase = true)
+}
