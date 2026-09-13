@@ -676,8 +676,19 @@ fun BottomSheetPlayer(
                 val currentPlayerDuration = playerConnection.player.duration
 
                 if (isTransitioning) {
-                    val elapsedSinceStart = SystemClock.elapsedRealtime() - startTime
-                    position = elapsedSinceStart
+                    // While the queue moves between items the player has not reported the
+                    // new media item yet, so the seek bar falls back to a wall-clock timer.
+                    // That timer used to run unconditionally, so when playback stalled —
+                    // e.g. the connection dropped and the player went IDLE — the UI kept
+                    // counting up with no audio playing. Only interpolate while the player
+                    // is genuinely able to progress.
+                    val playerState = playerConnection.player.playbackState
+                    val stalled =
+                        playerState == Player.STATE_IDLE || playerState == Player.STATE_ENDED
+                    if (!stalled) {
+                        val elapsedSinceStart = SystemClock.elapsedRealtime() - startTime
+                        position = elapsedSinceStart
+                    }
                     mediaMetadata?.let {
                         val metaDuration = it.duration.toLong() * 1000
                         duration = if (metaDuration > 0) metaDuration else 0L

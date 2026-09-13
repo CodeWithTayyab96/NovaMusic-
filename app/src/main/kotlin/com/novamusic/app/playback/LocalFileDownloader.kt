@@ -512,24 +512,41 @@ constructor(
     suspend fun deleteLocalFile(songId: String) {
         cancelWork(context, songId)
         val song = database.getSongById(songId)
-        song?.song?.localPath?.let { path ->
-            runCatching {
-                val uri = android.net.Uri.parse(path)
-                val deleteFile = when (uri.scheme) {
-                    "content" -> true
-                    "file" -> uri.path?.contains(FOLDER_NAME, ignoreCase = true) == true
-                    else -> false
-                }
-                if (deleteFile) {
-                    context.contentResolver.delete(uri, null, null)
-                }
-            }
-        }
+        song?.song?.localPath?.let { path -> deleteStoredFile(path) }
         database.query {
             val current = getSongByIdBlocking(songId)?.song ?: return@query
             update(current.copy(isLocal = false, localPath = null))
         }
         _progress.update { map -> map - songId }
+    }
+
+    /**
+     * Deletes the on-disk file behind a stored localPath.
+     *
+     * localPath is normally the raw MediaStore DATA column, which is a plain
+     * filesystem path with NO scheme (e.g. /storage/emulated/0/Music/NovaMusic/x.m4a).
+     * The previous implementation only handled "content" and "file" schemes and
+     * silently skipped every other case, so deleting a download cleared the database
+     * flags but left the audio file on disk: it disappeared from the app's download
+     * list while still being present in a file manager and playable in VLC.
+     *
+     * Only paths inside FOLDER_NAME are ever removed, so an unexpected or malformed
+     * path cannot delete unrelated user media.
+     */
+    private fun deleteStoredFile(path: String) {
+        runCatching {
+            val uri = Uri.parse(path)
+            if (uri.scheme == "content") {
+                // Removing the MediaStore row also removes the underlying file.
+                context.contentResolver.delete(uri, null, null)
+                return@runCatching
+            }
+            val filePath = if (uri.scheme == "file") uri.path.orEmpty() else path
+            if (filePath.isNotEmpty() && filePath.contains(FOLDER_NAME, ignoreCase = true)) {
+                val file = File(filePath)
+                if (file.exists()) file.delete()
+            }
+        }
     }
 
     /**
