@@ -571,7 +571,7 @@ interface DatabaseDao {
     @Transaction
     @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
     @Query("""
-        SELECT album.*, count(song.dateDownload) downloadCount
+        SELECT album.*, count(CASE WHEN song.isLocal = 1 THEN 1 END) downloadCount
         FROM album_artist_map 
             JOIN album ON album_artist_map.albumId = album.id
             JOIN song ON album_artist_map.albumId = song.albumId

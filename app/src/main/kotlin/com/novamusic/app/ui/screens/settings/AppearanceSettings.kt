@@ -81,7 +81,6 @@ import com.novamusic.app.constants.ShowLikedPlaylistKey
 import com.novamusic.app.constants.ShowDownloadedPlaylistKey
 import com.novamusic.app.constants.ShowHomeCategoryChipsKey
 import com.novamusic.app.constants.ShowTopPlaylistKey
-import com.novamusic.app.constants.ShowCachedPlaylistKey
 import com.novamusic.app.constants.ShowLocalPlaylistKey
 import com.novamusic.app.constants.ShowTagsInLibraryKey
 import com.novamusic.app.constants.SwipeThumbnailKey
@@ -229,10 +228,6 @@ fun AppearanceSettings(
     )
     val (showTopPlaylist, onShowTopPlaylistChange) = rememberPreference(
         ShowTopPlaylistKey,
-        defaultValue = true
-    )
-    val (showCachedPlaylist, onShowCachedPlaylistChange) = rememberPreference(
-        ShowCachedPlaylistKey,
         defaultValue = true
     )
     val (showLocalPlaylist, onShowLocalPlaylistChange) = rememberPreference(
@@ -973,13 +968,6 @@ fun AppearanceSettings(
             icon = { Icon(painterResource(R.drawable.trending_up), null) },
             checked = showTopPlaylist,
             onCheckedChange = onShowTopPlaylistChange
-        )
-
-        SwitchPreference(
-            title = { Text(stringResource(R.string.show_cached_playlist)) },
-            icon = { Icon(painterResource(R.drawable.cached), null) },
-            checked = showCachedPlaylist,
-            onCheckedChange = onShowCachedPlaylistChange
         )
 
         SwitchPreference(

@@ -45,7 +45,10 @@ data class SongEntity(
     val likedDate: LocalDateTime? = null,
     val totalPlayTime: Long = 0, // in milliseconds
     val inLibrary: LocalDateTime? = null,
-    val dateDownload: LocalDateTime? = LocalDateTime.now(),
+    // Set only when the user explicitly downloads the song. It used to default to
+    // LocalDateTime.now(), which stamped EVERY song with a download date the moment
+    // it entered the database — including songs that were merely streamed once.
+    val dateDownload: LocalDateTime? = null,
     @ColumnInfo(name = "isLocal", defaultValue = "0")
     val isLocal: Boolean = false,
     @ColumnInfo(name = "localPath")

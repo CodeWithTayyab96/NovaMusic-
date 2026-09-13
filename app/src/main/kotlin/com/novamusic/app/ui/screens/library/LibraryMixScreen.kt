@@ -84,7 +84,6 @@ import com.novamusic.app.constants.MixSortTypeKey
 import com.novamusic.app.constants.PlaylistSortType
 import com.novamusic.app.constants.PlaylistSortTypeKey
 import com.novamusic.app.constants.PlaylistTagsFilterKey
-import com.novamusic.app.constants.ShowCachedPlaylistKey
 import com.novamusic.app.constants.ShowDownloadedPlaylistKey
 import com.novamusic.app.constants.ShowLikedPlaylistKey
 import com.novamusic.app.constants.ShowLocalPlaylistKey
@@ -168,7 +167,6 @@ fun LibraryMixScreen(
     val (showLiked) = rememberPreference(ShowLikedPlaylistKey, true)
     val (showDownloaded) = rememberPreference(ShowDownloadedPlaylistKey, true)
     val (showTop) = rememberPreference(ShowTopPlaylistKey, true)
-    val (showCached) = rememberPreference(ShowCachedPlaylistKey, true)
     val (showLocal) = rememberPreference(ShowLocalPlaylistKey, true)
 
     val topSize by viewModel.topValue.collectAsStateWithLifecycle(initialValue = "50")
@@ -228,16 +226,6 @@ fun LibraryMixScreen(
                     iconRes = R.drawable.offline,
                     route = "auto_playlist/downloaded",
                     accentColor = MaterialTheme.colorScheme.primary,
-                )
-            )
-        }
-        if (showCached) {
-            add(
-                LibraryShortcutEntry(
-                    title = cachedTitle,
-                    iconRes = R.drawable.cached,
-                    route = "cache_playlist/cached",
-                    accentColor = MaterialTheme.colorScheme.tertiary,
                 )
             )
         }

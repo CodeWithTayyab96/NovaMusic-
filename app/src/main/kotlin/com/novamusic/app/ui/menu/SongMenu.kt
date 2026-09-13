@@ -96,7 +96,6 @@ import com.novamusic.app.ui.component.TextFieldDialog
 import com.novamusic.app.models.ItemMetadata
 import com.novamusic.app.ui.utils.ShowMediaInfo
 import com.novamusic.app.utils.rememberPreference
-import com.novamusic.app.viewmodels.CachePlaylistViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -129,7 +128,6 @@ fun SongMenu(
     val syncUtils = LocalSyncUtils.current
     var refetchIconDegree by remember { mutableFloatStateOf(0f) }
 
-    val cacheViewModel = hiltViewModel<CachePlaylistViewModel>()
 
     val rotationAnimation by animateFloatAsState(
         targetValue = refetchIconDegree,
@@ -689,35 +687,6 @@ fun SongMenu(
                     // (Our own downloads live in Music/NovaMusic and keep isLocal=true, so they
                     // still get a "Remove download" action.)
                     if (!song.song.isLocal || isDownloaded) {
-                        if (isFromCache) {
-                            ListItem(
-                                headlineContent = {
-                                    Text(
-                                        text = stringResource(R.string.remove_from_cache),
-                                        color = MaterialTheme.colorScheme.error,
-                                    )
-                                },
-                                leadingContent = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.delete),
-                                        tint = MaterialTheme.colorScheme.error,
-                                        contentDescription = null,
-                                    )
-                                },
-                                modifier =
-                                    Modifier.clickable {
-                                        onDismiss()
-                                        cacheViewModel.removeSongFromCache(song.id)
-                                    },
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            )
-
-                            HorizontalDivider(
-                                modifier = dividerModifier,
-                                color = MaterialTheme.colorScheme.outlineVariant,
-                            )
-                        }
-
                         when {
                             isDownloaded -> {
                                 ListItem(

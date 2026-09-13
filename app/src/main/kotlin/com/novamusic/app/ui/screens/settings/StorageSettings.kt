@@ -259,33 +259,6 @@ fun StorageSettings(
             onConfigure = null
         ),
         CacheItem(
-            id = "songs",
-            icon = R.drawable.ic_music,
-            title = stringResource(R.string.song_cache),
-            description = if (maxSongCacheSize == -1) {
-                stringResource(R.string.size_used, formatFileSize(playerCacheSize))
-            } else {
-                "${formatFileSize(playerCacheSize)} / ${formatFileSize(maxSongCacheSize * 1024 * 1024L)}"
-            },
-            progress = if (maxSongCacheSize > 0) playerCacheProgress else null,
-            onClear = { clearCacheDialog = true },
-            onConfigure = {
-                ListPreference(
-                    title = { Text(stringResource(R.string.max_cache_size)) },
-                    selectedValue = maxSongCacheSize,
-                    values = listOf(0, 128, 256, 512, 1024, 2048, 4096, 8192, -1),
-                    valueText = {
-                        when (it) {
-                            0 -> stringResource(R.string.disable)
-                            -1 -> stringResource(R.string.unlimited)
-                            else -> formatFileSize(it * 1024 * 1024L)
-                        }
-                    },
-                    onValueSelected = onMaxSongCacheSizeChange,
-                )
-            }
-        ),
-        CacheItem(
             id = "images",
             icon = R.drawable.image,
             title = stringResource(R.string.image_cache),

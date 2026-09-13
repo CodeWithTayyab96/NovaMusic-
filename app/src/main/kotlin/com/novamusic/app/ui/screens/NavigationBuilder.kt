@@ -66,7 +66,6 @@ import com.novamusic.app.ui.screens.playlist.AutoPlaylistScreen
 import com.novamusic.app.ui.screens.playlist.LocalPlaylistScreen
 import com.novamusic.app.ui.screens.playlist.OnlinePlaylistScreen
 import com.novamusic.app.ui.screens.playlist.TopPlaylistScreen
-import com.novamusic.app.ui.screens.playlist.CachePlaylistScreen
 import com.novamusic.app.ui.screens.search.OnlineSearchResult
 import com.novamusic.app.ui.screens.settings.AboutScreen
 import com.novamusic.app.ui.screens.settings.AccountSettings
@@ -278,17 +277,6 @@ fun NavGraphBuilder.navigationBuilder(
             ),
     ) {
         AutoPlaylistScreen(navController, scrollBehavior)
-    }
-    composable(
-        route = "cache_playlist/{playlist}",
-        arguments =
-            listOf(
-                navArgument("playlist") {
-                    type = NavType.StringType
-                },
-            ),
-    ) {
-        CachePlaylistScreen(navController, scrollBehavior)
     }
     composable(
         route = "top_playlist/{top}",

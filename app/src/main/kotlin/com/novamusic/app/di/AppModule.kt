@@ -18,7 +18,6 @@ import androidx.media3.datasource.cache.ContentMetadataMutations
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.NoOpCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
-import com.novamusic.app.constants.MaxSongCacheSizeKey
 import com.novamusic.app.db.InternalDatabase
 import com.novamusic.app.db.MusicDatabase
 import com.novamusic.app.utils.dataStore
@@ -112,6 +111,12 @@ private class LazyCache(
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
+    /**
+     * Hard ceiling for the disposable streaming/playback cache. See
+     * [providePlayerCache] for why this value and why it is no longer user-configurable.
+     */
+    private const val PLAYER_CACHE_MAX_BYTES = 256L * 1024 * 1024
+
     @Singleton
     @Provides
     fun provideDatabase(
@@ -131,15 +136,22 @@ object AppModule {
         @ApplicationContext context: Context,
         databaseProvider: DatabaseProvider,
     ): Cache {
-        val cacheSize = context.dataStore.get(MaxSongCacheSizeKey, 1024)
-        val evictor = when (cacheSize) {
-            -1 -> NoOpCacheEvictor()
-            else -> LeastRecentlyUsedCacheEvictor(cacheSize * 1024 * 1024L)
-        }
+        // Deliberately fixed and bounded. This cache exists only to make streaming
+        // smooth — it avoids re-fetching when the user seeks back or replays a track.
+        // It is NOT an offline library and must never behave like one.
+        //
+        // 256 MB is roughly 4-5 hours of ~128 kbps audio: comfortably more than a
+        // listening session needs, yet far too small to act as a download store.
+        // LeastRecentlyUsedCacheEvictor discards the oldest streamed data
+        // automatically, so ordinary listening can never grow storage without bound.
+        //
+        // Previously this read MaxSongCacheSizeKey (default 1024 MB) and treated -1 as
+        // "unlimited" via NoOpCacheEvictor — an unbounded cache that the removed Cache
+        // screen then surfaced to users as if it were their offline music.
         return LazyCache {
             SimpleCache(
                 context.filesDir.resolve("exoplayer"),
-                evictor,
+                LeastRecentlyUsedCacheEvictor(PLAYER_CACHE_MAX_BYTES),
                 databaseProvider,
             )
         }

@@ -1,0 +1,51 @@
+feat(cache)!: make streaming cache disposable and remove the user-facing Cache section
+
+Streaming used to leak into the library as if it were downloaded music. Three
+separate causes, all fixed:
+
+1. SongEntity.dateDownload defaulted to LocalDateTime.now(), so EVERY song was
+   stamped with a download date the moment it entered the database — including
+   songs that had only ever been streamed. Default is now null and the field is
+   written only when a download actually completes (LocalFileDownloader and
+   DownloadUtil already set it explicitly).
+
+2. CachePlaylistViewModel ran a 1-second loop that treated every key in the
+   playback cache as a "cached song", wrote dateDownload = now() onto it, and
+   published it as a Cached playlist in the library. Deleted along with the whole
+   Cache feature.
+
+3. The artist album query counted `count(song.dateDownload)` for downloadCount,
+   which counted streamed songs too. It now counts rows where isLocal = 1, i.e.
+   genuine downloads.
+
+Playback cache is now deliberately bounded and not user-configurable:
+- fixed 256 MB ceiling with LeastRecentlyUsedCacheEvictor, replacing a DataStore
+  value that defaulted to 1024 MB and treated -1 as "unlimited" (NoOpCacheEvictor,
+  i.e. unbounded).
+- 256 MB is roughly 4-5 hours of ~128 kbps audio: enough for smooth seeking and
+  replay within a session, far too small to act as an offline store. LRU eviction
+  discards the oldest streamed data automatically, so normal listening can never
+  grow storage without bound.
+- This is disposable playback buffering, NOT an offline library.
+
+Storage separation is unchanged and verified: the playback cache lives in
+filesDir/exoplayer and the download store in filesDir/download with
+NoOpCacheEvictor. Cache eviction can only ever touch the exoplayer directory, so
+it cannot delete explicit downloads. Downloads still survive cache eviction, app
+restart and cleanup.
+
+Cache UI removed:
+- deleted CachePlaylistScreen.kt, CachePlaylistViewModel.kt, CacheModels.kt
+  (CacheModels carried a duplicate, unused formatFileSize; the real one lives in
+  ui/utils/StringUtils.kt)
+- removed the cache_playlist/{playlist} navigation route
+- removed the Cached shortcut from both library screens
+- removed the "Remove from cache" song-menu action
+- removed the Song Cache row from Storage settings
+- removed the "Show cached playlist" appearance toggle and ShowCachedPlaylistKey
+
+Kept deliberately: R.drawable.cached is still used by the lyrics "refetch"
+button, an unrelated feature, so the icon stays. Nothing in MusicService,
+PlayerConnection, queue logic, Media3 wiring or the downloader was modified.
+
+Version: 2.0.2 (7) -> 2.0.3 (8).

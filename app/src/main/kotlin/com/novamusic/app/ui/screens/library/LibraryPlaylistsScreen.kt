@@ -63,7 +63,6 @@ import com.novamusic.app.constants.PlaylistSortDescendingKey
 import com.novamusic.app.constants.PlaylistSortType
 import com.novamusic.app.constants.PlaylistSortTypeKey
 import com.novamusic.app.constants.PlaylistTagsFilterKey
-import com.novamusic.app.constants.ShowCachedPlaylistKey
 import com.novamusic.app.constants.ShowDownloadedPlaylistKey
 import com.novamusic.app.constants.ShowLikedPlaylistKey
 import com.novamusic.app.constants.ShowTopPlaylistKey
@@ -156,18 +155,9 @@ fun LibraryPlaylistsScreen(
             songThumbnails = emptyList(),
         )
     }
-    val cachePlaylist = remember(cachedTitle) {
-        Playlist(
-            playlist = PlaylistEntity(id = "AUTO_CACHED_PLAYLISTS", name = cachedTitle, isEditable = false),
-            songCount = 0,
-            songThumbnails = emptyList(),
-        )
-    }
-
     val (showLiked) = rememberPreference(ShowLikedPlaylistKey, true)
     val (showDownloaded) = rememberPreference(ShowDownloadedPlaylistKey, true)
     val (showTop) = rememberPreference(ShowTopPlaylistKey, true)
-    val (showCached) = rememberPreference(ShowCachedPlaylistKey, true)
     val (ytmSync) = rememberPreference(YtmSyncKey, true)
 
     val shortcuts = buildList {
@@ -188,16 +178,6 @@ fun LibraryPlaylistsScreen(
                     iconRes = R.drawable.offline,
                     route = "auto_playlist/downloaded",
                     accentColor = MaterialTheme.colorScheme.primary,
-                ),
-            )
-        }
-        if (showCached) {
-            add(
-                PlaylistShortcutEntry(
-                    title = cachePlaylist.playlist.name,
-                    iconRes = R.drawable.cached,
-                    route = "cache_playlist/cached",
-                    accentColor = MaterialTheme.colorScheme.tertiary,
                 ),
             )
         }
