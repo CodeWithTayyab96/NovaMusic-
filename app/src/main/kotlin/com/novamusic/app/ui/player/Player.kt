@@ -119,6 +119,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.C
 import androidx.media3.common.Player.STATE_BUFFERING
+import androidx.media3.common.Player.STATE_ENDED
+import androidx.media3.common.Player.STATE_IDLE
 import androidx.media3.common.Player.STATE_READY
 import androidx.palette.graphics.Palette
 import androidx.navigation.NavController
@@ -684,7 +686,7 @@ fun BottomSheetPlayer(
                     // is genuinely able to progress.
                     val playerState = playerConnection.player.playbackState
                     val stalled =
-                        playerState == Player.STATE_IDLE || playerState == Player.STATE_ENDED
+                        playerState == STATE_IDLE || playerState == STATE_ENDED
                     if (!stalled) {
                         val elapsedSinceStart = SystemClock.elapsedRealtime() - startTime
                         position = elapsedSinceStart
