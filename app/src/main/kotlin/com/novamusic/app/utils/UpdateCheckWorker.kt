@@ -13,7 +13,6 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import com.novamusic.app.BuildConfig
 import com.novamusic.app.constants.EnableUpdateNotificationKey
 
 class UpdateCheckWorker(
@@ -28,9 +27,15 @@ class UpdateCheckWorker(
             val isEnabled = dataStore.data.map { it[EnableUpdateNotificationKey] ?: false }.first()
             if (!isEnabled) return Result.success()
 
-            Updater.getLatestVersionName().onSuccess { latestVersion ->
-                if (!Updater.isSameVersion(latestVersion, BuildConfig.VERSION_NAME)) {
-                    UpdateNotificationManager.notifyIfNewVersion(applicationContext, latestVersion)
+            // Uses Updater's authoritative "is strictly newer" check. The previous
+            // `!isSameVersion(...)` predicate also fired when the published release was
+            // OLDER than the installed build, which prompted users to downgrade.
+            Updater.checkForUpdate().onSuccess { update ->
+                if (update != null) {
+                    UpdateNotificationManager.notifyIfNewVersion(
+                        applicationContext,
+                        update.versionName,
+                    )
                 }
             }
 

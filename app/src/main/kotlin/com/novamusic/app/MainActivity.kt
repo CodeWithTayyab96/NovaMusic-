@@ -606,7 +606,7 @@ class MainActivity : ComponentActivity() {
 
             // fetch release notes and show sheet when a new version is detected
             LaunchedEffect(latestVersionName) {
-                if (!Updater.isSameVersion(latestVersionName, BuildConfig.VERSION_NAME)) {
+                if (Updater.isNewerThanInstalled(latestVersionName)) {
                     Updater.getLatestReleaseNotes().onSuccess {
                         releaseNotesState.value = it
                     }.onFailure {
@@ -1419,9 +1419,8 @@ class MainActivity : ComponentActivity() {
                                                     ) {
                                                         BadgedBox(
                                                             badge = {
-                                                                if (!Updater.isSameVersion(
-                                                                        latestVersionName,
-                                                                        BuildConfig.VERSION_NAME
+                                                                if (Updater.isNewerThanInstalled(
+                                                                        latestVersionName
                                                                     )
                                                                 ) {
                                                                     Badge()

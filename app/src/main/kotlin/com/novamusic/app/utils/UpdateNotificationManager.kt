@@ -28,7 +28,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import com.novamusic.app.BuildConfig
 import com.novamusic.app.MainActivity
 import com.novamusic.app.R
 import com.novamusic.app.constants.EnableUpdateNotificationKey
@@ -101,9 +100,9 @@ object UpdateNotificationManager {
 
                 dataStore.edit { it[LastUpdateCheckKey] = now }
 
-                Updater.getLatestVersionName().onSuccess { latestVersion ->
-                    if (!Updater.isSameVersion(latestVersion, BuildConfig.VERSION_NAME)) {
-                        notifyIfNewVersion(context, latestVersion)
+                Updater.checkForUpdate().onSuccess { update ->
+                    if (update != null) {
+                        notifyIfNewVersion(context, update.versionName)
                     }
                 }
             } catch (e: Exception) {
@@ -117,7 +116,7 @@ object UpdateNotificationManager {
             val dataStore = context.dataStore
             val lastNotified = dataStore.data.map { it[LastNotifiedVersionKey] ?: "" }.first()
 
-            if (latestVersion != lastNotified && !Updater.isSameVersion(latestVersion, BuildConfig.VERSION_NAME)) {
+            if (latestVersion != lastNotified && Updater.isNewerThanInstalled(latestVersion)) {
                 showUpdateNotification(context, latestVersion)
                 dataStore.edit { it[LastNotifiedVersionKey] = latestVersion }
             }

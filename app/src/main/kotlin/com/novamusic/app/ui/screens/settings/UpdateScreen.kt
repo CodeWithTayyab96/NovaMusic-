@@ -188,7 +188,7 @@ fun UpdateScreen(
         if (updateCheckState == UpdateCheckState.Loading) return
         coroutineScope.launch {
             updateCheckState = UpdateCheckState.Loading
-            Updater.checkForUpdate(BuildConfig.VERSION_NAME)
+            Updater.checkForUpdate()
                 .onSuccess { info ->
                     if (info == null) {
                         updateCheckState = UpdateCheckState.UpToDate
@@ -341,7 +341,7 @@ fun UpdateScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                                 latestVersion?.let { latest ->
-                                    if (!Updater.isSameVersion(latest, BuildConfig.VERSION_NAME)) {
+                                    if (Updater.isNewerThanInstalled(latest)) {
                                         Spacer(Modifier.height(2.dp))
                                         Text(
                                             text = stringResource(R.string.latest_version_format, latest),

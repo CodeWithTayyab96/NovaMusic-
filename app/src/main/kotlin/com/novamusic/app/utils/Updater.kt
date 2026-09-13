@@ -143,6 +143,11 @@ object Updater {
     private val semVerRegex =
         Regex("""(?i)\bv?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?\b""")
 
+    // Matches the release-notes marker emitted by .github/workflows/release-build.yml,
+    // e.g. a line reading "novamusic-version-code: 6".
+    private val versionCodeRegex =
+        Regex("""novamusic-version-code:\s*(\d+)""", RegexOption.IGNORE_CASE)
+
     private fun parseSemVerOrNull(text: String): SemVer? {
         val match = semVerRegex.find(text) ?: return null
         val major = match.groupValues.getOrNull(1)?.toIntOrNull() ?: return null
@@ -184,6 +189,72 @@ object Updater {
             a.trim() == b.trim()
         }
     }
+
+    // ─── Autoritative "is there an update?" comparison ──────────────────────
+    //
+    // This is the ONE place that decides whether a release is an upgrade.
+    // Every call site must go through it. The rule is strictly
+    //
+    //     latest >  current  → update available
+    //     latest == current  → no update
+    //     latest <  current  → no update   (NEVER offer a downgrade)
+    //     unparseable        → no update   (fail closed, never prompt blindly)
+    //
+    // "latest != current" is NOT evidence of an update: with the published
+    // releases at 1.0.3 while the app ships 2.0.0, that predicate told every
+    // user to "upgrade" to an older build.
+
+    /**
+     * True only when [candidate] is a strictly NEWER semantic version than [current].
+     * Returns false when either side cannot be parsed — an unknown version must never
+     * be offered as an upgrade.
+     */
+    internal fun isNewerSemVer(candidate: String, current: String): Boolean {
+        val candidateSemVer = parseSemVerOrNull(candidate) ?: return false
+        val currentSemVer = parseSemVerOrNull(current) ?: return false
+        return candidateSemVer > currentSemVer
+    }
+
+    /**
+     * Reads the machine-readable `novamusic-version-code: <n>` marker that the release
+     * workflow stamps into the release notes. GitHub Releases have no native versionCode
+     * field, so this marker is how the authoritative Android version code travels with
+     * the release. Null when the release predates the marker or has no body.
+     */
+    internal fun extractVersionCode(release: ReleaseInfo): Int? =
+        release.body
+            ?.let { versionCodeRegex.find(it) }
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.toIntOrNull()
+            ?.takeIf { it > 0 }
+
+    /**
+     * The single authoritative upgrade decision for a candidate release.
+     *
+     * Prefers the release's stamped Android [versionCode] (mirroring what the platform
+     * itself uses to decide whether one APK may upgrade another), and falls back to
+     * semantic-version ordering when the release carries no version code.
+     */
+    internal fun isUpdateAvailable(
+        latest: ReleaseInfo,
+        currentVersionName: String,
+        currentVersionCode: Int,
+    ): Boolean {
+        val latestCode = extractVersionCode(latest)
+        if (latestCode != null) return latestCode > currentVersionCode
+
+        val latestName =
+            preferredReleaseVersionNameOrNull(latest) ?: latest.name.ifBlank { latest.tagName }
+        return isNewerSemVer(latestName, currentVersionName)
+    }
+
+    /**
+     * Convenience for UI that only holds the latest version *name* (no release object).
+     * Delegates to [isNewerSemVer] so the ordering rule stays defined in one place.
+     */
+    fun isNewerThanInstalled(candidateVersionName: String): Boolean =
+        isNewerSemVer(candidateVersionName, BuildConfig.VERSION_NAME)
 
     internal fun findLatestRelease(releases: List<ReleaseInfo>): ReleaseInfo? {
         if (releases.isEmpty()) return null
@@ -292,20 +363,28 @@ object Updater {
     // ─── Comprobación de actualización ─────────────────────────────────────────
 
     /**
-     * Comprueba si hay una versión más reciente que [currentVersionName].
+     * Preferred entry point: reads the installed version from BuildConfig so call sites
+     * cannot pass a stale or mismatched version. Kept deliberately argument-free.
+     * Returns null when no strictly-newer release exists (including when the newest
+     * published release is older than the installed build).
      */
-    suspend fun checkForUpdate(currentVersionName: String): Result<UpdateInfo?> =
+    suspend fun checkForUpdate(): Result<UpdateInfo?> =
         runCatching {
-            checkForUpdateStable(currentVersionName)
+            checkForUpdateStable(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)
         }
 
-    private suspend fun checkForUpdateStable(currentVersionName: String): UpdateInfo? {
+    private suspend fun checkForUpdateStable(
+        currentVersionName: String,
+        currentVersionCode: Int,
+    ): UpdateInfo? {
         val latest = getLatestReleaseInfo().getOrThrow()
         val latestVersionName =
             preferredReleaseVersionNameOrNull(latest)
                 ?: latest.name.ifBlank { latest.tagName }
 
-        if (isSameVersion(latestVersionName, currentVersionName)) return null
+        // Strictly "newer than". Never "different from": an older published release
+        // (e.g. 1.0.3 while the app is 2.0.0) must not be offered as an update.
+        if (!isUpdateAvailable(latest, currentVersionName, currentVersionCode)) return null
 
         val downloadUrl = resolveApkDownloadUrl(latest.tagName)
 

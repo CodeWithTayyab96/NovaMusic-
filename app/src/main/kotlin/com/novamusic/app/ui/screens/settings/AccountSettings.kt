@@ -144,7 +144,7 @@ fun AccountSettings(
     var showTokenEditor by remember { mutableStateOf(false) }
     var showPlaylistDialog by remember { mutableStateOf(false) }
 
-    val hasUpdate = !Updater.isSameVersion(latestVersionName, BuildConfig.VERSION_NAME)
+    val hasUpdate = Updater.isNewerThanInstalled(latestVersionName)
 
     Column(
         modifier = Modifier
@@ -767,8 +767,17 @@ private fun AppVersionFooter() {
             fontWeight = FontWeight.Medium
         )
         Spacer(Modifier.height(2.dp))
+        // Expose the commit the APK was built from so any installed build can be
+        // identified exactly. Release versionName stays clean ("2.0.1"); the commit
+        // travels in BuildConfig.GIT_COMMIT, which CI pins via GIT_COMMIT.
+        val versionLine =
+            "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})" +
+                BuildConfig.GIT_COMMIT
+                    .takeIf { it.isNotBlank() && it != "unknown" }
+                    ?.let { " · Build $it" }
+                    .orEmpty()
         Text(
-            text = "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+            text = versionLine,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
         )

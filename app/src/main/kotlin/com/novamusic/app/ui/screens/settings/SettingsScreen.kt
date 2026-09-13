@@ -46,7 +46,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
-import com.novamusic.app.BuildConfig
 import com.novamusic.app.R
 import com.novamusic.app.ui.component.IconButton
 import com.novamusic.app.ui.component.TopSearch
@@ -110,7 +109,7 @@ fun SettingsScreen(
     }
 
     val shouldShowPermissionHint = !isStorageGranted || !isNotificationGranted
-    val hasUpdate = !Updater.isSameVersion(latestVersionName, BuildConfig.VERSION_NAME)
+    val hasUpdate = Updater.isNewerThanInstalled(latestVersionName)
 
     val resetSearch: () -> Unit = {
         isSearching = false
