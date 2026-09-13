@@ -67,7 +67,17 @@ fun PlaybackError(
         when (errorInfo.kind) {
             PlaybackErrorKind.LoginRefreshRequired -> stringResource(R.string.playback_login_refresh_required)
             PlaybackErrorKind.ConfirmationRequired -> stringResource(R.string.playback_confirmation_required)
-            else -> fallbackUnknown
+            // A dropped connection is not an "Unknown error". The heading used to fall
+            // through to the generic unknown text for every other kind, so a plain
+            // network failure was announced as something mysterious.
+            PlaybackErrorKind.NoInternet -> fallbackNoInternet
+            PlaybackErrorKind.Timeout -> fallbackTimeout
+            PlaybackErrorKind.NoStream -> fallbackNoStream
+            PlaybackErrorKind.MalformedStream -> fallbackMalformedStream
+            PlaybackErrorKind.Decoder,
+            PlaybackErrorKind.Http,
+            PlaybackErrorKind.Unknown,
+            -> fallbackUnknown
         }
     val reason =
         when (errorInfo.kind) {
@@ -84,10 +94,25 @@ fun PlaybackError(
                 ?: fallbackUnknown
         }
 
+    // User-actionable failures ("no network", timeouts, missing streams) are fully
+    // explained by their message. Dumping the raw exception chain
+    // (HttpDataSourceException -> ExecutionException -> UnknownHostException) tells the
+    // user nothing and reads like a crash report. Keep the technical block only for
+    // genuinely unexpected failures, where it actually helps diagnosis.
+    val showTechnicalDetails =
+        when (errorInfo.kind) {
+            PlaybackErrorKind.Unknown,
+            PlaybackErrorKind.Http,
+            PlaybackErrorKind.Decoder,
+            -> true
+            else -> false
+        }
+
     val details =
-        remember(error, reason, httpCode) {
+        remember(error, reason, httpCode, showTechnicalDetails) {
             buildString {
                 appendLine(reason)
+                if (!showTechnicalDetails) return@buildString
                 appendLine("Code: ${error.errorCode}")
                 if (httpCode != null) appendLine("HTTP: $httpCode")
 
