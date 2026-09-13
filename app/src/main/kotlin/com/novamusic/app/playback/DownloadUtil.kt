@@ -117,13 +117,11 @@ constructor(
         ) { dataSpec ->
             val mediaId = dataSpec.key ?: error("No media id")
             val length = if (dataSpec.length >= 0) dataSpec.length else 1
-            if (playerCache.cacheSpace > 500 * 1024 * 1024L) {
-                kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
-                    playerCache.keys.shuffled().take(10).forEach { key ->
-                        playerCache.getCachedSpans(key).sumOf { it.length }
-                    }
-                }
-            }
+            // Removed: a GlobalScope.launch block used to shuffle the whole cache
+            // key set here on every cache read once the cache exceeded 500 MB. It
+            // computed `sumOf { it.length }` and threw the result away, so it did
+            // nothing but allocate and shuffle on the playback hot path, and it was
+            // unscoped/uncancellable. Cache eviction is handled by Media3.
             if (playerCache.isCached(mediaId, dataSpec.position, length)) {
                 return@Factory dataSpec
             }
