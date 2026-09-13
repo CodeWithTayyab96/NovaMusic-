@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import okhttp3.Request
 import okio.Buffer
+import okio.BufferedSource
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -236,10 +237,60 @@ constructor(
                     // download. Re-opening it per chunk with mode "wa" does not append on
                     // MediaStore (each chunk overwrote from byte 0), so only the final chunk
                     // survived on disk and the container verification below rejected the file.
-                    // Every chunk now writes into this single stream; the Range/resume logic,
-                    // retries and progress reporting below are unchanged.
                     context.contentResolver.openOutputStream(uri)?.use { output ->
-                        while (bytesDownloaded < contentLength || contentLength <= 0) {
+                        val buffer = Buffer()
+
+                        // Streams one response body into `output`, emitting throttled progress.
+                        // Declared as a suspend function value so it can still call the suspend
+                        // onProgress callback from inside this non-suspend `use` scope.
+                        val drain: suspend (BufferedSource) -> Long = { input ->
+                            var written = 0L
+                            while (true) {
+                                val read = input.read(buffer, BUFFER_SIZE)
+                                if (read == -1L) break
+                                // Buffer.copyTo() only PEEKS — it does not consume — so writing
+                                // with copyTo() alone re-wrote the same first 64 KB on every
+                                // iteration. readByteArray() consumes exactly what was read.
+                                output.write(buffer.readByteArray(read))
+                                bytesDownloaded += read
+                                written += read
+
+                                val p = if (contentLength > 0) {
+                                    (bytesDownloaded.toFloat() / contentLength).coerceIn(0f, 1f)
+                                } else 0f
+
+                                val now = SystemClock.elapsedRealtime()
+                                val progressDelta = p - lastEmittedProgress
+                                if (now - lastEmitAt >= PROGRESS_EMIT_INTERVAL_MS || progressDelta >= PROGRESS_EMIT_DELTA) {
+                                    lastEmitAt = now
+                                    lastEmittedProgress = p
+                                    val state = LocalDownloadState(
+                                        songId = songId,
+                                        title = safeTitle,
+                                        artist = artist,
+                                        state = LocalDownloadState.State.DOWNLOADING,
+                                        progress = p,
+                                        bytesDownloaded = bytesDownloaded,
+                                        totalBytes = contentLength,
+                                    )
+                                    _progress.update { map -> map + (songId to state) }
+                                    onProgress?.invoke(state)
+                                }
+                            }
+                            written
+                        }
+
+                        // The probe request above already asked for the whole stream
+                        // (Range: bytes=0-), so its body IS chunk 0 — write it directly.
+                        // Issuing a second bytes=0- request against the same tokenized
+                        // googlevideo URL made the CDN serve the file twice, and those
+                        // repeat responses can come back as a non-audio stub, which is
+                        // what ended up at the head of the saved file.
+                        drain(body.source())
+
+                        // Resume loop: only for known-length streams that ended early.
+                        // An unknown length (chunked body) was fully delivered above.
+                        while (contentLength > 0 && bytesDownloaded < contentLength) {
                             val req = Request.Builder()
                                 .url(currentStreamUrl)
                                 .header("Range", "bytes=$bytesDownloaded-")
@@ -268,57 +319,28 @@ constructor(
                                     throw IOException("HTTP ${chunkResp.code} while resuming download for $songId at $bytesDownloaded bytes")
                                 }
 
-                                val chunkBody = chunkResp.body ?: return@use
-                                chunkBody.source().use { input ->
-                                    val buffer = Buffer()
-                                    while (true) {
-                                        val read = input.read(buffer, BUFFER_SIZE)
-                                        if (read == -1L) break
-                                        buffer.copyTo(output, read)
-                                        bytesDownloaded += read
-                                        chunkRead += read
-
-                                        val p = if (contentLength > 0) {
-                                            (bytesDownloaded.toFloat() / contentLength).coerceIn(0f, 1f)
-                                        } else 0f
-
-                                        val now = SystemClock.elapsedRealtime()
-                                        val progressDelta = p - lastEmittedProgress
-                                        if (now - lastEmitAt >= PROGRESS_EMIT_INTERVAL_MS || progressDelta >= PROGRESS_EMIT_DELTA) {
-                                            lastEmitAt = now
-                                            lastEmittedProgress = p
-                                            val state = LocalDownloadState(
-                                                songId = songId,
-                                                title = safeTitle,
-                                                artist = artist,
-                                                state = LocalDownloadState.State.DOWNLOADING,
-                                                progress = p,
-                                                bytesDownloaded = bytesDownloaded,
-                                                totalBytes = contentLength,
-                                            )
-                                            _progress.update { map -> map + (songId to state) }
-                                            onProgress?.invoke(state)
-                                        }
-                                    }
+                                // Same non-audio guard as the probe: a resumed response can
+                                // also be a stub page. Refuse before appending it mid-file.
+                                val chunkCt = (chunkResp.header("Content-Type") ?: "")
+                                    .substringBefore(';').trim().lowercase()
+                                if (!isPlausibleAudioContentType(chunkCt, expectedMime)) {
+                                    throw IOException(
+                                        "Resume response for $songId is non-audio: HTTP ${chunkResp.code} | " +
+                                            "Content-Type: \"$chunkCt\" — refusing to append it",
+                                    )
                                 }
+
+                                val chunkBody = chunkResp.body ?: return@use
+                                chunkRead = drain(chunkBody.source())
                             }
 
-                            if (contentLength > 0 && bytesDownloaded >= contentLength) {
-                                break
-                            }
-
-                            if (chunkRead == 0L) {
-                                // No data was read in this chunk attempt
-                                if (contentLength > 0 && bytesDownloaded < contentLength) {
-                                    if (resumeAttempts < MAX_RESUME_ATTEMPTS) {
-                                        resumeAttempts++
-                                        Thread.sleep(500L)
-                                        continue
-                                    } else {
-                                        throw IOException("Download incomplete: got $bytesDownloaded of $contentLength bytes for $songId")
-                                    }
+                            if (chunkRead == 0L && bytesDownloaded < contentLength) {
+                                if (resumeAttempts < MAX_RESUME_ATTEMPTS) {
+                                    resumeAttempts++
+                                    Thread.sleep(500L)
+                                    continue
                                 } else {
-                                    break
+                                    throw IOException("Download incomplete: got $bytesDownloaded of $contentLength bytes for $songId")
                                 }
                             }
                         }
@@ -327,10 +349,33 @@ constructor(
                     if (contentLength > 0 && bytesDownloaded < contentLength) {
                         throw IOException("Download incomplete: got $bytesDownloaded of $contentLength bytes for $songId")
                     }
+                    if (bytesDownloaded == 0L) {
+                        throw IOException(
+                            "Stream returned no audio data for $songId " +
+                                "(HTTP ${initialResp.code}, Content-Type: \"$rawContentType\", " +
+                                "expected $contentLength bytes)",
+                        )
+                    }
 
                     Log.i(TAG, "Downloaded $songId: wrote $bytesDownloaded of $contentLength bytes")
 
-                    verifySavedContainer(uri, songId, extension)
+                    // Container magic check. On failure, attach what actually landed on disk
+                    // so the cause is readable from logcat/notification instead of guessed at.
+                    try {
+                        verifySavedContainer(uri, songId, extension)
+                    } catch (e: IOException) {
+                        val head = headPreview(uri)
+                        Log.e(
+                            TAG,
+                            "Container check failed for $songId: wrote $bytesDownloaded of " +
+                                "$contentLength bytes, HTTP ${initialResp.code}, " +
+                                "Content-Type: \"$rawContentType\", head=[$head]",
+                        )
+                        throw IOException(
+                            "${e.message} — wrote $bytesDownloaded of $contentLength bytes, head=[$head]",
+                            e,
+                        )
+                    }
 
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         values.clear()
@@ -643,6 +688,34 @@ constructor(
         )
         if (mismatch) {
             Log.w(TAG, "Container/extension mismatch for $songId — external players may refuse this file")
+        }
+    }
+
+    /**
+     * Reads the first [count] bytes of a saved download and renders them as hex plus a
+     * printable-ASCII preview. Diagnostic only: it makes a container-verification failure
+     * readable straight from logcat / the failure notification instead of being guessed
+     * at. Never includes URLs, signatures or credentials.
+     */
+    private fun headPreview(uri: Uri, count: Int = 16): String {
+        val buf = ByteArray(count)
+        val stream = runCatching { context.contentResolver.openInputStream(uri) }.getOrNull()
+            ?: return "unreadable"
+        return stream.use { input ->
+            var off = 0
+            while (off < count) {
+                val r = input.read(buf, off, count - off)
+                if (r <= 0) break
+                off += r
+            }
+            if (off == 0) return "empty"
+            val head = buf.copyOf(off)
+            val hex = head.joinToString(" ") { "%02X".format(it.toInt() and 0xFF) }
+            val ascii = head.joinToString("") { b ->
+                val c = b.toInt() and 0xFF
+                if (c in 32..126) c.toChar().toString() else "."
+            }
+            "$hex \"$ascii\""
         }
     }
 
