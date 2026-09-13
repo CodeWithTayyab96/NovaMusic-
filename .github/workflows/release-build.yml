@@ -49,8 +49,31 @@ jobs:
 
       # Signing env vars come from repo secrets; the signingConfig in
       # app/build.gradle.kts reads them via System.getenv(...).
+      # Single source of truth for the version: app/build.gradle.kts. Reading it
+      # here (instead of asking for it as a second input) makes it impossible to
+      # publish a tag that disagrees with the APK that was actually built.
+      - name: Read version from Gradle
+        run: |
+          VERSION_CODE=$(grep -oE 'versionCode[[:space:]]*=[[:space:]]*[0-9]+' app/build.gradle.kts | grep -oE '[0-9]+' | head -1)
+          VERSION_NAME=$(grep -oE 'versionName[[:space:]]*=[[:space:]]*"[^"]+"' app/build.gradle.kts | sed -E 's/.*"([^"]+)"/\1/' | head -1)
+          test -n "$VERSION_CODE" || { echo "::error::Could not read versionCode from app/build.gradle.kts"; exit 1; }
+          test -n "$VERSION_NAME" || { echo "::error::Could not read versionName from app/build.gradle.kts"; exit 1; }
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "::notice::Building $VERSION_NAME (versionCode $VERSION_CODE)"
+
+          # Refuse to publish a tag that disagrees with the built version
+          # (e.g. tag v2.0.1 while the APK is still 2.0.0).
+          TAG_VERSION="${{ inputs.version }}"
+          TAG_VERSION="${TAG_VERSION#v}"
+          if [ "$TAG_VERSION" != "$VERSION_NAME" ]; then
+            echo "::error::Tag '${{ inputs.version }}' does not match versionName '$VERSION_NAME' in app/build.gradle.kts."
+            exit 1
+          fi
+
       - name: Build signed release APK (universal)
         env:
+          GIT_COMMIT: ${{ github.sha }}
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -85,6 +108,24 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: app/build/outputs/apk/universal/release/app-universal-release.apk
+
+      # The in-app updater compares against Android versionCode when it can, and
+      # GitHub Releases have no native versionCode field. Stamp it into the release
+      # notes (as an HTML comment so it is invisible when rendered) where
+      # Updater.extractVersionCode() can read it via the API.
+      - name: Stamp release notes with version metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "${{ inputs.version }}" --json body -q .body > notes.md || true
+          {
+            echo "<!-- novamusic-version-code: $VERSION_CODE"
+            echo "novamusic-version-name: $VERSION_NAME -->"
+            echo
+            cat notes.md
+          } > stamped.md
+          gh release edit "${{ inputs.version }}" --notes-file stamped.md
+          echo "::notice::Stamped release notes with versionCode $VERSION_CODE"
 
       # Always delete the decoded keystore from the runner workspace, even if the
       # build above failed, so it never lingers or gets cached/uploaded.

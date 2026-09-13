@@ -16,6 +16,14 @@ fun fetchGitCommitHash(): String {
     // GitHub API fallback added latency + a hard dependency on the network.
     // Override with the GIT_COMMIT env var (e.g. in CI) when needed.
     return try {
+        // CI sets GIT_COMMIT explicitly. Prefer it over reading .git: with the Gradle
+        // configuration cache enabled, a restored configuration entry can otherwise
+        // stamp a PREVIOUS run's commit into the build, which makes two different CI
+        // builds indistinguishable (and made a debug APK look like an older commit).
+        System.getenv("GIT_COMMIT")
+            ?.takeIf { it.isNotBlank() }
+            ?.let { return it.take(7) }
+
         val gitDir = rootProject.file(".git")
         if (!gitDir.isDirectory) return System.getenv("GIT_COMMIT") ?: "unknown"
         val head = gitDir.resolve("HEAD").readText().trim()
@@ -58,8 +66,8 @@ android {
         applicationId = "com.novamusic.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
-        versionName = "2.0.0"
+        versionCode = 6
+        versionName = "2.0.1"
 //        versionName = "3.0.2-$gitCommit"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

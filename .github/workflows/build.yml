@@ -33,7 +33,12 @@ jobs:
       # so there is no plain "assembleDebug" task. The debug APK task is
       # "assembleUniversalDebug" and the output lands under
       # app/build/outputs/apk/universal/debug/.
+      # GIT_COMMIT pins the build identity to the commit being built. Without it
+      # fetchGitCommitHash() reads .git, and the Gradle configuration cache can
+      # restore a previous run's value — which made distinct builds look identical.
       - name: Build debug APK (universal)
+        env:
+          GIT_COMMIT: ${{ github.sha }}
         run: ./gradlew assembleUniversalDebug --no-daemon --stacktrace
 
       - name: Upload APK
@@ -86,6 +91,7 @@ jobs:
       # it well within the 16GB runner.
       - name: Build all variants + run unit tests
         env:
+          GIT_COMMIT: ${{ github.sha }}
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
