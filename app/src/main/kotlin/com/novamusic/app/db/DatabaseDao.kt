@@ -716,7 +716,7 @@ interface DatabaseDao {
         "UPDATE lyrics SET translatedLyrics = :translatedLyrics, " +
             "translationLanguage = :translationLanguage WHERE id = :id",
     )
-    suspend fun updateLyricsTranslation(
+    fun updateLyricsTranslation(
         id: String,
         translatedLyrics: String?,
         translationLanguage: String?,

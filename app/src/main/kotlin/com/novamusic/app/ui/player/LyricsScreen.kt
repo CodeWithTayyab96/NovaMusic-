@@ -74,6 +74,7 @@ import com.novamusic.app.constants.PlayerBackgroundStyleKey
 import com.novamusic.app.constants.SliderStyle
 import com.novamusic.app.constants.SliderStyleKey
 import com.novamusic.app.db.entities.LyricsEntity
+import com.novamusic.app.db.entities.effectiveLyricsOverride
 import com.novamusic.app.extensions.togglePlayPause
 import com.novamusic.app.extensions.toggleRepeatMode
 import com.novamusic.app.models.MediaMetadata
