@@ -10,6 +10,7 @@ package com.novamusic.app.db.entities
 
 import androidx.compose.runtime.Immutable
 import androidx.room.ColumnInfo
+import com.novamusic.app.utils.LOCAL_SONG_ID_PREFIX
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -85,6 +86,16 @@ data class SongEntity(
      * True when this song was downloaded by the app itself (files live in
      * Music/NovaMusic), as opposed to a scanned on-device file.
      */
-    fun isDownloadedByApp(): Boolean =
-        isLocal && localPath?.contains("NovaMusic", ignoreCase = true) == true
+    fun isDownloadedByApp(): Boolean {
+        if (!isLocal) return false
+        // Rows the device scanner imported carry the scanner's id prefix; any other
+        // local row was downloaded by the app itself.
+        //
+        // Relying on the path alone was fragile: on Android 10+ the MediaStore DATA
+        // column is frequently unavailable, so localPath falls back to a content://
+        // URI containing no folder name. Such a song then looked like it had never
+        // been downloaded, so its menu offered no way to delete it.
+        if (!id.startsWith(LOCAL_SONG_ID_PREFIX)) return true
+        return localPath?.contains("NovaMusic", ignoreCase = true) == true
+    }
 }

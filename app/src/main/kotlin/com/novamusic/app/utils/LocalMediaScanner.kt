@@ -29,11 +29,15 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 
 /** Stable id prefix for songs sourced from on-device MediaStore audio. */
-private const val LOCAL_SONG_ID_PREFIX = "LM"
+internal const val LOCAL_SONG_ID_PREFIX = "LM"
 
 /** Minimum audio duration in milliseconds. Files shorter than this are almost certainly
  *  voice notes, ringtones, or notification sounds rather than music. */
 private const val MIN_DURATION_MS = 30_000L
+
+// NovaMusic's own download folder (Music/NovaMusic). Files here are already in the
+// library as the song that downloaded them.
+private const val APP_DOWNLOAD_FOLDER = "NovaMusic"
 
 /** Regex matching WhatsApp voice note filenames: AUD-YYYYMMDD-WAnnnn, PTT-*, voice-*. */
 private val WHATSAPP_VOICE_NOTE_PATTERN =
@@ -55,6 +59,19 @@ private val NON_MUSIC_DIR_PATHS = setOf(
 )
 
 /** Returns true when the file/path/title looks like non-music audio (voice note, ringtone, etc.). */
+/**
+ * True when a scanned file lives in NovaMusic's own download folder.
+ *
+ * Those files are already represented by the entry that downloaded them, complete
+ * with proper title, artist and artwork. Importing the physical file as well created
+ * a second library row titled after the filename with "Unknown artist" — the
+ * duplicates seen in the Downloaded list.
+ */
+private fun isAppDownloadFile(filePath: String?, relativePath: String?): Boolean =
+    sequenceOf(filePath, relativePath)
+        .filterNotNull()
+        .any { it.contains(APP_DOWNLOAD_FOLDER, ignoreCase = true) }
+
 private fun isNonMusicAudioFile(
     filePath: String?,
     relativePath: String?,
@@ -168,6 +185,13 @@ object LocalMediaScanner {
                 // The IS_MUSIC flag is unreliable on many OEM ROMs and these apps often
                 // set it on their voice notes. Filter by path pattern and filename.
                 if (isNonMusicAudioFile(filePath, relativePath, displayName, storeTitle)) {
+                    continue
+                }
+
+                // Skip the app's own downloads: they are already in the library via the
+                // song that downloaded them, so scanning them again duplicated every
+                // downloaded track.
+                if (isAppDownloadFile(filePath, relativePath)) {
                     continue
                 }
 

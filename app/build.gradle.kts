@@ -66,8 +66,8 @@ android {
         applicationId = "com.novamusic.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 11
-        versionName = "2.0.6"
+        versionCode = 12
+        versionName = "2.0.7"
 //        versionName = "3.0.2-$gitCommit"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
