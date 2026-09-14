@@ -704,6 +704,24 @@ interface DatabaseDao {
     @Query("SELECT * FROM lyrics WHERE id = :id LIMIT 1")
     suspend fun getLyricsById(id: String): LyricsEntity?
 
+    /**
+     * Stores a translation without touching [LyricsEntity.lyrics].
+     *
+     * A targeted UPDATE is deliberate: upserting a whole LyricsEntity built from
+     * (id, translatedLyrics) would write null into the original `lyrics` column and
+     * destroy it — the exact bug this feature replaces. It also avoids a
+     * read-modify-write race with the background lyrics writers.
+     */
+    @Query(
+        "UPDATE lyrics SET translatedLyrics = :translatedLyrics, " +
+            "translationLanguage = :translationLanguage WHERE id = :id",
+    )
+    suspend fun updateLyricsTranslation(
+        id: String,
+        translatedLyrics: String?,
+        translationLanguage: String?,
+    )
+
     @Transaction
     @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
     @Query("SELECT *, (SELECT COUNT(1) FROM song_artist_map JOIN song ON song_artist_map.songId = song.id WHERE artistId = artist.id AND song.inLibrary IS NOT NULL) AS songCount FROM artist WHERE songCount > 0 ORDER BY rowId")

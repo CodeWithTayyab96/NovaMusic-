@@ -616,6 +616,8 @@ NovaMusic will only extract your token, and everything else is stored locally.</
     <string name="update_text">Update</string>
     <!-- Translate UI strings -->
     <string name="translate">Translate</string>
+    <string name="lyrics_view_original">Original</string>
+    <string name="lyrics_view_translated">Translated</string>
     <string name="language_label">Language</string>
     <string name="lyrics">Lyrics</string>
     <string name="translation_success">Translation saved</string>

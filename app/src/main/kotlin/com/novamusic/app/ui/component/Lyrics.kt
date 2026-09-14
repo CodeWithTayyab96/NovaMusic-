@@ -408,6 +408,15 @@ fun Lyrics(
     lyricsSyncOffset: Int,
     sliderPositionProvider: () -> Long?,
     modifier: Modifier = Modifier,
+    /**
+     * Effective lyrics text to render — the original, or a translation when the user has
+     * switched viewing mode. Defaults to null, in which case the entity's own `lyrics` is
+     * used exactly as before, so every existing caller is unaffected.
+     *
+     * Only the source string is injected; parsing, syncing, word-level timing and sentinel
+     * handling all continue unchanged on whichever string arrives.
+     */
+    lyricsOverride: String? = null,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val menuState = LocalMenuState.current
@@ -446,7 +455,9 @@ fun Lyrics(
 
     val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
     val lyricsEntity by playerConnection.currentLyrics.collectAsStateWithLifecycle(initialValue = null)
-    val lyrics = remember(lyricsEntity) { lyricsEntity?.lyrics?.trim() }
+    val lyrics = remember(lyricsEntity, lyricsOverride) {
+        (lyricsOverride ?: lyricsEntity?.lyrics)?.trim()
+    }
 
 
     val romanizationPreferences = remember(

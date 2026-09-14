@@ -126,7 +126,7 @@ fun LyricsMenu(
             initialTextFieldValue = TextFieldValue(lyricsProvider()?.lyrics.orEmpty()),
             singleLine = false,
             onDone = {
-                viewModel.updateLyrics(mediaMetadataProvider(), it)
+                viewModel.updateOriginalLyrics(mediaMetadataProvider(), it)
             },
         )
     }
@@ -271,9 +271,9 @@ fun LyricsMenu(
                     onClick = {
                         onDismiss()
                         viewModel.cancelSearch()
-                        viewModel.updateLyrics(
+                        viewModel.updateOriginalLyrics(
                             searchMediaMetadata,
-                            result.lyrics
+                            result.lyrics,
                         )
                     },
                     modifier = Modifier
@@ -589,7 +589,14 @@ fun LyricsMenu(
 
                                     out.joinToString("\n")
                                 }
-                                viewModel.updateLyrics(mediaMetadataProvider(), translatedLyrics)
+                                // translationLanguage records the language this text is
+                                // ACTUALLY in, so the UI never labels a translation by
+                                // whatever language happens to be selected.
+                                viewModel.updateLyrics(
+                                    mediaMetadata = mediaMetadataProvider(),
+                                    translatedLyrics = translatedLyrics,
+                                    translationLanguage = languageName,
+                                )
                                 showTranslateDialog = false
                             } catch (e: Exception) {
                                 Toast.makeText(

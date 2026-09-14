@@ -98,13 +98,49 @@ constructor(
         }
     }
 
-    fun updateLyrics(
+    /**
+     * Replaces the ORIGINAL lyrics — used by the manual edit dialog and when the user picks
+     * a different lyrics search result.
+     *
+     * Distinct from [updateLyrics] on purpose: that one stores a translation and must never
+     * touch the original, whereas this one IS the original changing. Any stored translation
+     * is cleared, because it was derived from the previous original and would no longer
+     * correspond to the new one.
+     */
+    fun updateOriginalLyrics(
         mediaMetadata: MediaMetadata,
         lyrics: String,
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             database.query {
                 upsert(LyricsEntity(mediaMetadata.id, lyrics))
+            }
+        }
+    }
+
+    /**
+     * Stores a translation of the song's ORIGINAL lyrics.
+     *
+     * Never writes [LyricsEntity.lyrics], so the original survives and remains the source
+     * for every later translation and for "original" display mode. Callers must pass text
+     * translated FROM THE ORIGINAL (never from a previous translation) plus the language
+     * that text is actually in.
+     *
+     * The lyrics screen observes database.lyrics(id) through PlayerConnection.currentLyrics,
+     * so this write refreshes the UI with no manual refresh.
+     */
+    fun updateLyrics(
+        mediaMetadata: MediaMetadata,
+        translatedLyrics: String,
+        translationLanguage: String,
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            database.query {
+                updateLyricsTranslation(
+                    id = mediaMetadata.id,
+                    translatedLyrics = translatedLyrics,
+                    translationLanguage = translationLanguage,
+                )
             }
         }
     }

@@ -166,6 +166,15 @@ private val HEAD_LYRICS_ENTRY = LyricsEntry(time = 0L, text = "")
 fun LyricsV2(
     sliderPositionProvider: () -> Long?,
     modifier: Modifier = Modifier,
+    /**
+     * Effective lyrics text to render — the original, or a translation when the user has
+     * switched viewing mode. Defaults to null, in which case the entity's own `lyrics` is
+     * used exactly as before, so every existing caller is unaffected.
+     *
+     * Only the source string is injected; parsing, syncing, TTML handling and sentinel
+     * handling all continue unchanged on whichever string arrives.
+     */
+    lyricsOverride: String? = null,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val player = playerConnection.player
@@ -214,7 +223,7 @@ fun LyricsV2(
     var showShareDialog by remember { mutableStateOf(false) }
     // ── Lyrics data ──
     val currentLyrics by playerConnection.currentLyrics.collectAsStateWithLifecycle(initialValue = null)
-    val lyrics = currentLyrics?.lyrics
+    val lyrics = lyricsOverride ?: currentLyrics?.lyrics
 
     // ── Parse lyrics into entries ──
     val isSynced = remember(lyrics) { lyrics != null && (lyrics!!.startsWith("[") || isTtml(lyrics!!)) }

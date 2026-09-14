@@ -38,6 +38,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -130,6 +131,29 @@ fun LyricsScreen(
     val sliderStyle by rememberEnumPreference(SliderStyleKey, SliderStyle.Standard)
     val currentLyrics by playerConnection.currentLyrics.collectAsStateWithLifecycle(initialValue = null)
     val (useLyricsV2) = rememberPreference(UseLyricsV2Key, defaultValue = false)
+
+    // ── Original / Translated viewing mode ──────────────────────────────────────────
+    // Viewing state lives here because LyricsScreen is the common parent of both renderer
+    // variants and both orientations.
+    //
+    // Keyed on the song id so switching tracks can never carry the previous song's
+    // translated-view state into a song that has no translation.
+    var showingTranslation by rememberSaveable(mediaMetadata.id) { mutableStateOf(false) }
+
+    // Defensive: the persisted translation is only usable when it is non-blank and not the
+    // LYRICS_NOT_FOUND sentinel, and there must be real original lyrics to translate from.
+    val translationAvailable = currentLyrics?.hasUsableTranslation == true
+
+    // If the translation disappears (song changed, translation cleared, lyrics refetched)
+    // fall back to the original rather than rendering nothing.
+    LaunchedEffect(mediaMetadata.id, translationAvailable) {
+        if (!translationAvailable) showingTranslation = false
+    }
+
+    // null means "let the renderer use the entity's own original lyrics", so the renderer's
+    // existing behaviour is preserved exactly whenever translated mode is not active.
+    val renderLyricsOverride =
+        effectiveLyricsOverride(entity = currentLyrics, showingTranslation = showingTranslation)
 
     // Auto-fetch lyrics when no lyrics found (same logic as refetch)
     LaunchedEffect(mediaMetadata.id, currentLyrics) {
@@ -339,6 +363,13 @@ fun LyricsScreen(
                             )
                         }
 
+                        LyricsTranslationToggle(
+                            translationAvailable = translationAvailable,
+                            showingTranslation = showingTranslation,
+                            onToggle = { showingTranslation = !showingTranslation },
+                            tint = textBackgroundColor,
+                        )
+
                         // More button (right)
                         Box(
                             modifier = Modifier
@@ -384,13 +415,15 @@ fun LyricsScreen(
                             ) {
                                 if (useLyricsV2) {
                                     LyricsV2(
-                                        sliderPositionProvider = { sliderPosition }
+                                        sliderPositionProvider = { sliderPosition },
+                                        lyricsOverride = renderLyricsOverride,
                                     )
                                 } else {
                                     Lyrics(
                                         sliderPositionProvider = { sliderPosition },
                                         lyricsSyncOffset = lyricsSyncOffset,
                                         modifier = modifier,
+                                        lyricsOverride = renderLyricsOverride,
                                     )
                                 }
                             }
@@ -643,6 +676,13 @@ fun LyricsScreen(
                             )
                         }
 
+                        LyricsTranslationToggle(
+                            translationAvailable = translationAvailable,
+                            showingTranslation = showingTranslation,
+                            onToggle = { showingTranslation = !showingTranslation },
+                            tint = textBackgroundColor,
+                        )
+
                         // More button (right)
                         Box(
                             modifier = Modifier
@@ -676,13 +716,15 @@ fun LyricsScreen(
                     ) {
                         if (useLyricsV2) {
                             LyricsV2(
-                                sliderPositionProvider = { sliderPosition }
+                                sliderPositionProvider = { sliderPosition },
+                                lyricsOverride = renderLyricsOverride,
                             )
                         } else {
                             Lyrics(
                                 sliderPositionProvider = { sliderPosition },
                                 lyricsSyncOffset = lyricsSyncOffset,
                                 modifier = modifier,
+                                lyricsOverride = renderLyricsOverride,
                             )
                         }
                     }
@@ -895,5 +937,43 @@ fun LyricsScreen(
                 onDismiss = { showLyricsMenu = false }
             )
         }
+    }
+}
+
+/**
+ * Original / Translated viewing toggle.
+ *
+ * Deliberately always rendered so the feature stays discoverable, but disabled and dimmed
+ * when the song has no usable translation — it must never imply a translation exists when
+ * none does. The label shows the mode the user would switch TO.
+ */
+@Composable
+private fun LyricsTranslationToggle(
+    translationAvailable: Boolean,
+    showingTranslation: Boolean,
+    onToggle: () -> Unit,
+    tint: Color,
+) {
+    Box(
+        modifier =
+            Modifier
+                .padding(end = 4.dp)
+                .clickable(enabled = translationAvailable, onClick = onToggle)
+                .padding(horizontal = 6.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text =
+                stringResource(
+                    if (showingTranslation) {
+                        R.string.lyrics_view_original
+                    } else {
+                        R.string.lyrics_view_translated
+                    },
+                ),
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            color = tint.copy(alpha = if (translationAvailable) 1f else 0.35f),
+        )
     }
 }
