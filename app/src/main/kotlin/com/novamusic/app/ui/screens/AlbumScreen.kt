@@ -667,7 +667,7 @@ fun AlbumScreen(
                                     } else {
                                         Icon(
                                             painter = painterResource(R.drawable.download),
-                                            contentDescription = "Descargar carátula",
+                                            contentDescription = "Download cover",
                                             tint = Color.White.copy(alpha = 0.8f), // Ícono semi-transparente
                                             modifier = Modifier.size(24.dp) // Ícono más pequeño
                                         )

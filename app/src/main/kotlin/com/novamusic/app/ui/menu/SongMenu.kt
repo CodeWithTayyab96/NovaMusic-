@@ -594,7 +594,11 @@ fun SongMenu(
             }
         }
 
-        if (event != null || playlistSong != null || !song.song.isLocal) {
+        // isDownloaded must be part of this guard: a downloaded song IS local, so
+        // `!isLocal` is false and the whole section — including "Remove download" —
+        // was skipped for exactly the songs it exists to manage. Opening a song from
+        // the Downloaded list therefore offered no way to delete it.
+        if (event != null || playlistSong != null || !song.song.isLocal || isDownloaded) {
             item {
                 Spacer(modifier = Modifier.height(12.dp))
             }

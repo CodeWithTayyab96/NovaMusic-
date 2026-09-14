@@ -101,7 +101,7 @@ fun LanguageSelectorBottomSheet(
     selectedCode: String,
     systemDefaultCode: String? = null,
     systemDefaultLabel: String = "",
-    searchPlaceholder: String = "Buscar idioma",
+    searchPlaceholder: String = "Search language",
     onDismiss: () -> Unit,
     onLanguageSelected: (String) -> Unit,
 ) {

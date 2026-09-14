@@ -166,7 +166,7 @@ fun LocalSongsScreen(
 
     val songs by remember(allSongs, selectedFolders) {
         derivedStateOf {
-            if (selectedFolders.isEmpty() || selectedFolders.contains("Todas")) {
+            if (selectedFolders.isEmpty() || selectedFolders.contains("All")) {
                 allSongs
             } else {
                 allSongs.filter { song ->
@@ -239,7 +239,7 @@ fun LocalSongsScreen(
             } else if (songs.isEmpty() && !isScanning) {
                 item(key = "empty", contentType = CONTENT_TYPE_HEADER) {
                     EmptySongsCard(
-                        isFiltered = selectedFolders.isNotEmpty() && !selectedFolders.contains("Todas"),
+                        isFiltered = selectedFolders.isNotEmpty() && !selectedFolders.contains("All"),
                         onScan = { scan() }
                     )
                 }
@@ -318,7 +318,7 @@ private fun LocalDeviceHeader(
 
     val subtitle by remember(selectedFolders, allFoldersText) {
         derivedStateOf {
-            if (selectedFolders.isEmpty() || selectedFolders.contains("Todas")) {
+            if (selectedFolders.isEmpty() || selectedFolders.contains("All")) {
                 allFoldersText
             } else {
                 selectedFolders.sorted().joinToString(separator = " • ")

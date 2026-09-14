@@ -256,7 +256,7 @@ fun DeviceSelectionBottomSheet(
                             .padding(12.dp)
                     ) {
                         Text(
-                            text = "Cerrar",
+                            text = "Close",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )

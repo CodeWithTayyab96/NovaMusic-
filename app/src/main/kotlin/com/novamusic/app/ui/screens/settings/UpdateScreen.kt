@@ -200,7 +200,7 @@ fun UpdateScreen(
                     }
                 }
                 .onFailure { err ->
-                    updateCheckState = UpdateCheckState.Error(err.message ?: "Error desconocido")
+                    updateCheckState = UpdateCheckState.Error(err.message ?: "Unknown error")
                 }
         }
     }
@@ -367,7 +367,7 @@ fun UpdateScreen(
                         ) {
                             val (msg, color) = when (val s = updateCheckState) {
                                 UpdateCheckState.UpToDate  ->
-                                    "Ya tienes la versión más reciente." to MaterialTheme.colorScheme.tertiary
+                                    "You already have the latest version." to MaterialTheme.colorScheme.tertiary
                                 is UpdateCheckState.Error  ->
                                     "Error: ${s.message}" to MaterialTheme.colorScheme.error
                                 else -> "" to MaterialTheme.colorScheme.onSurface
@@ -552,13 +552,13 @@ private fun UpdateDetailsBottomSheet(
                 .padding(bottom = 32.dp + LocalPlayerAwareWindowInsets.current.asPaddingValues().calculateBottomPadding())
         ) {
             Text(
-                text = "Nueva versión disponible",
+                text = "New version available",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "Versión ${info.versionName}",
+                text = "Version ${info.versionName}",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -604,7 +604,7 @@ private fun UpdateDetailsBottomSheet(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Descargando actualización…",
+                            text = "Downloading update…",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -624,7 +624,7 @@ private fun UpdateDetailsBottomSheet(
                     )
                     
                     Text(
-                        text = "La aplicación se reiniciará al finalizar la descarga.",
+                        text = "The app will restart when the download finishes.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
