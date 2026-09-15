@@ -469,10 +469,27 @@ fun LyricsMenu(
                     )
                 } else {
                     TextButton(onClick = {
-                        isTranslating = true
-                        val inputText = textFieldValue.text
                         val languageCode = selectedLanguageCode
                         val languageName = selectedLanguageName
+
+                        // Reuse a stored translation for the SAME language rather than spending
+                        // another request. The endpoint is rate limited, so repeating an
+                        // identical translation was pure waste. Guarded by the entity's own
+                        // usability rule (blank / LYRICS_NOT_FOUND are not translations).
+                        val existingEntity = lyricsProvider()
+                        if (
+                            canReuseStoredTranslation(
+                                storedTranslation = existingEntity?.usableTranslatedLyrics,
+                                storedLanguage = existingEntity?.translationLanguage,
+                                requestedLanguage = languageName,
+                            )
+                        ) {
+                            showTranslateDialog = false
+                            return@TextButton
+                        }
+
+                        isTranslating = true
+                        val inputText = textFieldValue.text
                         coroutineScope.launch {
                             try {
                                 val lang = try {
@@ -559,16 +576,18 @@ fun LyricsMenu(
                                                     translatedMap[batchIndices[i]] = parts[i]
                                                 }
                                             } else {
-                                                for (idx in batchIndices) {
-                                                    val original = contents[idx]!!
-                                                    val singleTranslated = runCatching {
-                                                        translator.translateBlocking(
-                                                            original,
-                                                            lang
-                                                        ).translatedText
-                                                    }.getOrNull() ?: original
-                                                    translatedMap[idx] = singleTranslated
-                                                }
+                                                // Never fall back to one request per line. That
+                                                // turned a single batch into up to 50 rapid calls
+                                                // and is what produced HTTP 429. Failing the
+                                                // whole operation costs one request and leaves the
+                                                // original untouched, which is strictly better than
+                                                // hammering a rate-limited endpoint.
+                                                throw IllegalStateException(
+                                                    "Translation response could not be mapped back " +
+                                                        "to ${batchTexts.size} line(s) (got " +
+                                                        "${parts.size}); refusing to issue one " +
+                                                        "request per line",
+                                                )
                                             }
                                         }
                                     }
@@ -768,3 +787,22 @@ fun LyricsMenu(
         )
     }
 }
+
+/**
+ * Whether a stored translation can be reused instead of calling the network again.
+ *
+ * Requires a usable stored translation AND that it is already in the requested language.
+ * The language check uses the PERSISTED [storedLanguage] (what the text actually is), never
+ * the currently selected one — so a stale selection can never be served the wrong text.
+ * Reusing avoids spending requests against a rate-limited endpoint for no benefit.
+ *
+ * Pure so the rule is unit testable without a device.
+ */
+internal fun canReuseStoredTranslation(
+    storedTranslation: String?,
+    storedLanguage: String?,
+    requestedLanguage: String,
+): Boolean =
+    !storedTranslation.isNullOrBlank() &&
+        !storedLanguage.isNullOrBlank() &&
+        storedLanguage == requestedLanguage

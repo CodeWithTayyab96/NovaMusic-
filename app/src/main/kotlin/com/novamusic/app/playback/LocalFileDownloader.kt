@@ -346,15 +346,30 @@ constructor(
                         }
                     }
 
-                    if (contentLength > 0 && bytesDownloaded < contentLength) {
-                        throw IOException("Download incomplete: got $bytesDownloaded of $contentLength bytes for $songId")
-                    }
+                    // Completion is only valid when the total length is KNOWN and all of it
+                    // arrived. Previously both checks were gated on `contentLength > 0`, so an
+                    // unknown length (-1, when the server sends neither Content-Range nor
+                    // Content-Length) skipped the fetch loop entirely, wrote only the probe
+                    // chunk, and still reported COMPLETED — leaving a playable header plus part
+                    // of the media. A non-zero byte count only proves SOME bytes arrived; it is
+                    // never proof of completion.
                     if (bytesDownloaded == 0L) {
                         throw IOException(
                             "Stream returned no audio data for $songId " +
                                 "(HTTP ${initialResp.code}, Content-Type: \"$rawContentType\", " +
                                 "expected $contentLength bytes)",
                         )
+                    }
+                    if (contentLength <= 0L) {
+                        throw IOException(
+                            "Cannot verify download for $songId: server reported no usable length " +
+                                "(Content-Range total and Content-Length both missing), " +
+                                "wrote $bytesDownloaded bytes (HTTP ${initialResp.code}, " +
+                                "Content-Type: \"$rawContentType\")",
+                        )
+                    }
+                    if (!isDownloadComplete(bytesDownloaded, contentLength)) {
+                        throw IOException("Download incomplete: got $bytesDownloaded of $contentLength bytes for $songId")
                     }
 
                     Log.i(TAG, "Downloaded $songId: wrote $bytesDownloaded of $contentLength bytes")
@@ -942,3 +957,16 @@ internal fun isDeletableDownloadPath(path: String, folderName: String = "NovaMus
         }
     return filePath.isNotEmpty() && filePath.contains(folderName, ignoreCase = true)
 }
+
+/**
+ * Whether a download can be considered complete.
+ *
+ * True only when the total length is known AND every byte arrived. `bytesWritten > 0` is
+ * deliberately NOT accepted as proof: a non-zero count only shows that SOME bytes were
+ * received, which is exactly how a truncated file used to be reported as a finished
+ * download (unknown length -> fetch loop skipped -> probe chunk written -> "COMPLETED").
+ *
+ * Pure so the rule is unit testable without a network or a device.
+ */
+internal fun isDownloadComplete(bytesWritten: Long, contentLength: Long): Boolean =
+    contentLength > 0L && bytesWritten >= contentLength
