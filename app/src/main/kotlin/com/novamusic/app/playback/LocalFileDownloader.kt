@@ -955,7 +955,16 @@ internal fun isDeletableDownloadPath(path: String, folderName: String = "NovaMus
         } else {
             path
         }
-    return filePath.isNotEmpty() && filePath.contains(folderName, ignoreCase = true)
+    // The folder name must be its OWN path segment, not merely a substring.
+    //
+    // A substring check was unsafe: the app's package name is `com.novamusic.app`, which
+    // CONTAINS "novamusic", so the streaming cache path
+    // /data/user/0/com.novamusic.app/files/exoplayer/… matched and was treated as a
+    // deletable download. Requiring a whole segment keeps /…/Music/NovaMusic/song.m4a
+    // deletable while excluding the cache directory.
+    return filePath
+        .split('/')
+        .any { it.isNotEmpty() && it.equals(folderName, ignoreCase = true) }
 }
 
 /**
