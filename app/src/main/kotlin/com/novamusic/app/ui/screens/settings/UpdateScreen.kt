@@ -243,7 +243,11 @@ fun UpdateScreen(
                             }
                         } catch (e: Exception) {
                             isDownloading = false
-                            downloadError = context.getString(R.string.download_error, e.message ?: "Unknown error")
+                            downloadError =
+                                context.getString(
+                                    R.string.download_error,
+                                    sanitizeNetworkErrorMessage(e.message),
+                                )
                             Updater.cleanupDownloadedApk(destination)
                         }
                     }
@@ -736,4 +740,19 @@ private fun formatCommitDate(isoDate: String): String = try {
     SimpleDateFormat("MMM d", Locale.getDefault()).format(inputFormat.parse(isoDate)!!)
 } catch (e: Exception) {
     isoDate.take(10)
+}
+
+/**
+ * Reduces a network exception message to something a person can read.
+ *
+ * Ktor embeds the entire request URL in messages like
+ * "Socket timeout has expired [url=https://…?sp=r&sv=2018-11-09&se=…&sig=…]". For a GitHub
+ * release asset that is a signed, ~1000-character query string: unreadable on screen and it
+ * exposes a signed URL. Keep the reason, drop the URL block.
+ */
+private fun sanitizeNetworkErrorMessage(message: String?): String {
+    if (message.isNullOrBlank()) return "Unknown error"
+    val withoutUrl = message.substringBefore("[url=").substringBefore("\n").trim()
+    if (withoutUrl.isNotBlank()) return withoutUrl
+    return message.substringBefore("?").trim().ifBlank { "Network error" }
 }

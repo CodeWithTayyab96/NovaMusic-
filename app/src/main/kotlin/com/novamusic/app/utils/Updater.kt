@@ -21,6 +21,8 @@ import com.novamusic.app.constants.GitHubReleasesJsonKey
 import com.novamusic.app.constants.GitHubReleasesLastCheckedAtKey
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.get
 import io.ktor.client.request.headers
 import io.ktor.client.request.prepareGet
@@ -75,7 +77,18 @@ private data class ReleasesNetworkResult(
 )
 
 object Updater {
-    private val client = HttpClient()
+    // Explicit timeouts. `HttpClient()` with no configuration inherits the engine defaults,
+    // which for the OkHttp engine means a 10 SECOND socket timeout. That is fine for the
+    // release-list API but hopeless for a ~29 MB APK: any stall longer than 10s aborted the
+    // update download with "Socket timeout has expired". API calls stay fail-fast here; the
+    // download overrides these per request.
+    private val client = HttpClient {
+        install(HttpTimeout) {
+            connectTimeoutMillis = 15_000
+            requestTimeoutMillis = 30_000
+            socketTimeoutMillis = 30_000
+        }
+    }
     private const val ReleaseCacheCheckIntervalMs: Long = 6 * 60 * 60 * 1000L
     var lastCheckTime = -1L
         private set
@@ -432,7 +445,16 @@ object Updater {
 
 
     fun downloadApk(url: String, destinationFile: File): Flow<Float> = flow {
-        client.prepareGet(url).execute { response ->
+        client
+            .prepareGet(url) {
+                // A large APK on a slow connection needs far more than the 30s default. The
+                // socket timeout matters most: it is what was expiring mid-download.
+                timeout {
+                    requestTimeoutMillis = 15 * 60 * 1000
+                    socketTimeoutMillis = 60 * 1000
+                }
+            }
+            .execute { response ->
             val totalBytes = response.contentLength() ?: -1L
             val channel: ByteReadChannel = response.bodyAsChannel()
             var downloadedBytes = 0L
