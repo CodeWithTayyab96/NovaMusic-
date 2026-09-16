@@ -177,7 +177,16 @@ abstract class InternalDatabase : RoomDatabase() {
                         *universalMigrations,
                     )
                     .addCallback(DatabaseCallback())
-                    .fallbackToDestructiveMigration()
+                    // fallbackToDestructiveMigration() was REMOVED on purpose. It silently drops
+                    // and recreates every table whenever Room cannot find a migration path, so a
+                    // future version bump without a migration would quietly erase the user's
+                    // library. UniversalMigration is registered for every version from 2 up to
+                    // CURRENT_VERSION, so a normal upgrade always has a path; if one is ever
+                    // missing we now fail loudly instead of destroying data.
+                    //
+                    // The DOWNGRADE fallback is kept: installing an older APK over a newer
+                    // database is an explicit user action, and Room cannot open a database whose
+                    // version is ahead of the code without either downgrading it or refusing.
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
                     .setTransactionExecutor(java.util.concurrent.Executors.newFixedThreadPool(4))
@@ -207,11 +216,29 @@ abstract class InternalDatabase : RoomDatabase() {
 
                 db = build()
                 runCatching { db.openHelper.writableDatabase }.getOrElse { openError ->
-                    Log.e(TAG, "Database still failed to open after schema repair=$repaired, recreating database", openError)
+                    // Deliberately NOT deleting the database.
+                    //
+                    // This file holds songs, playlists, play history, lyrics, download metadata
+                    // and preferences. Wiping all of it to recover from a schema problem
+                    // destroys far more than it repairs, and does so silently. The previous
+                    // behaviour called context.deleteDatabase(DB_NAME) here, which is how a
+                    // routine schema bump could erase a user's library.
+                    //
+                    // Fail in a controlled, visible way instead and leave the file intact so the
+                    // data can still be recovered or exported.
+                    Log.e(
+                        TAG,
+                        "Database still failed to open after schema repair=$repaired. " +
+                            "Leaving the database file intact; refusing to delete user data.",
+                        openError,
+                    )
                     runCatching { db.close() }
-                    runCatching { context.deleteDatabase(DB_NAME) }
-                    db = build()
-                    db.openHelper.writableDatabase
+                    throw IllegalStateException(
+                        "NovaMusic could not open its database after a schema repair attempt. " +
+                            "The database file has been left untouched. " +
+                            "Cause: ${openError.javaClass.simpleName}: ${openError.message}",
+                        openError,
+                    )
                 }
             }
 
@@ -320,6 +347,16 @@ private class UniversalMigration(
         try {
             val expected = expectedDb.openHelper.writableDatabase
             SchemaTools.reconcileDatabase(db = db, expectedDb = expected)
+
+            // Room validates a database by comparing room_master_table.identity_hash with the
+            // hash of the schema it expects. reconcileDatabase() fixes the PHYSICAL schema but
+            // used to leave the stored hash at the OLD version, so Room rejected the result
+            // with "Room cannot verify the data integrity" and the app fell into the repair /
+            // reset path — which is how a schema bump could wipe user data.
+            //
+            // The hash is copied from the in-memory database Room itself just created, so it
+            // is the authoritative identity for this schema. It is never hardcoded.
+            SchemaTools.copyIdentityHash(from = expected, to = db)
             Log.i(TAG, "Migration completed successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Migration failed", e)
@@ -392,6 +429,26 @@ private object SchemaTools {
         expectedTriggers.forEach { db.execSQL(it.sql!!) }
 
         db.execSQL("PRAGMA foreign_keys=ON")
+    }
+
+    /**
+     * Copies Room's authoritative identity hash from a freshly created [from] database into
+     * [to].
+     *
+     * Room generates the expected hash when it creates the in-memory database from the
+     * current entity definitions, so this is exactly the value it will later verify against —
+     * no hardcoded constant, and it stays correct automatically whenever the schema changes.
+     */
+    fun copyIdentityHash(
+        from: SupportSQLiteDatabase,
+        to: SupportSQLiteDatabase,
+    ) {
+        val identityHash = readIdentityHash(from)
+        if (identityHash == null) {
+            Log.w(TAG, "Expected database exposed no identity hash; leaving the target unchanged")
+            return
+        }
+        updateIdentityHash(db = to, identityHash = identityHash)
     }
 
     private fun readIdentityHash(db: SupportSQLiteDatabase): String? =
