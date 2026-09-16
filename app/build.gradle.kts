@@ -177,6 +177,12 @@ android {
         generateLocaleConfig = true
     }
 
+    testOptions {
+        // Robolectric needs the merged Android resources (and the Room schema JSONs that
+        // MigrationTestHelper loads from assets) to be available to unit tests.
+        unitTests.isIncludeAndroidResources = true
+    }
+
     packaging {
         jniLibs {
             useLegacyPackaging = false
@@ -294,6 +300,11 @@ dependencies {
 
     implementation(libs.timber)
     testImplementation(libs.junit)
+    // Room migration testing. MigrationTestHelper needs a real SQLite + Android runtime, so
+    // it runs on Robolectric rather than a device. These three are the minimum required.
+    testImplementation(libs.room.testing)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
     implementation(libs.translator)
     implementation(libs.lifecycle.process)
     implementation(libs.lifecycle.runtime.compose)

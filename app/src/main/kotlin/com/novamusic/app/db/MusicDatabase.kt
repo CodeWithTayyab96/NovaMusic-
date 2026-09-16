@@ -163,11 +163,22 @@ abstract class InternalDatabase : RoomDatabase() {
     companion object {
         const val DB_NAME = "song.db"
 
+        /**
+         * The exact migration set the production database registers.
+         *
+         * Exposed so the migration test runs the SAME migrations the app runs, rather than a
+         * parallel copy that could silently drift out of sync with production.
+         */
+        internal fun universalMigrationsFor(context: Context): Array<Migration> =
+            (2 until CURRENT_VERSION)
+                .map { from -> UniversalMigration(context, from, CURRENT_VERSION) }
+                .toTypedArray()
+
+        /** The version this build expects, for tests and diagnostics. */
+        internal const val DB_VERSION: Int = CURRENT_VERSION
+
         fun newInstance(context: Context): MusicDatabase {
-            val universalMigrations =
-                (2 until CURRENT_VERSION)
-                    .map { from -> UniversalMigration(context, from, CURRENT_VERSION) }
-                    .toTypedArray()
+            val universalMigrations = universalMigrationsFor(context)
 
             fun build(): InternalDatabase =
                 Room
