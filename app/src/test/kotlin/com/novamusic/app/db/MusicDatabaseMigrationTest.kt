@@ -15,6 +15,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
+import kotlin.collections.buildSet
 
 /**
  * Real 28 -> 29 migration test, running against actual SQLite via Robolectric.
@@ -76,28 +77,28 @@ class MusicDatabaseMigrationTest {
         val reopened = openWithRoom()
 
         // ── Step 6: data survived ──
-        assertEquals(2, reopened.query("SELECT COUNT(*) FROM song").use { it.intAt(0) })
-        assertEquals(2, reopened.query("SELECT COUNT(*) FROM playlist").use { it.intAt(0) })
-        assertEquals(1, reopened.query("SELECT COUNT(*) FROM searchHistory").use { it.intAt(0) })
+        assertEquals(2, reopened.query("SELECT COUNT(*) FROM song", emptyArray()).use { it.intAt(0) })
+        assertEquals(2, reopened.query("SELECT COUNT(*) FROM playlist", emptyArray()).use { it.intAt(0) })
+        assertEquals(1, reopened.query("SELECT COUNT(*) FROM searchHistory", emptyArray()).use { it.intAt(0) })
 
-        val lyricsCount = reopened.query("SELECT COUNT(*) FROM lyrics").use { it.intAt(0) }
+        val lyricsCount = reopened.query("SELECT COUNT(*) FROM lyrics", emptyArray()).use { it.intAt(0) }
         assertEquals(2, lyricsCount)
 
         // Original lyrics are byte-for-byte unchanged.
         val storedOriginal =
             reopened
-                .query("SELECT lyrics FROM lyrics WHERE id = 'song-1'")
+                .query("SELECT lyrics FROM lyrics WHERE id = 'song-1'", emptyArray())
                 .use { it.stringAt(0) }
         assertEquals(ORIGINAL_LYRICS, storedOriginal)
 
         // Titles and names unchanged.
         assertEquals(
             "Zaroorat",
-            reopened.query("SELECT title FROM song WHERE id = 'song-1'").use { it.stringAt(0) },
+            reopened.query("SELECT title FROM song WHERE id = 'song-1'", emptyArray()).use { it.stringAt(0) },
         )
         assertEquals(
             "Road Trip",
-            reopened.query("SELECT name FROM playlist WHERE id = 'pl-2'").use { it.stringAt(0) },
+            reopened.query("SELECT name FROM playlist WHERE id = 'pl-2'", emptyArray()).use { it.stringAt(0) },
         )
 
         // ── Step 7: the new columns exist and are null for pre-existing rows ──
@@ -106,13 +107,13 @@ class MusicDatabaseMigrationTest {
         assertTrue("translationLanguage column missing", columns.contains("translationLanguage"))
 
         reopened
-            .query("SELECT translatedLyrics FROM lyrics WHERE id = 'song-1'")
+            .query("SELECT translatedLyrics FROM lyrics WHERE id = 'song-1'", emptyArray())
             .use { cursor ->
                 cursor.moveToFirst()
                 assertNull("pre-existing row must have no translation", cursor.stringOrNull(0))
             }
         reopened
-            .query("SELECT translationLanguage FROM lyrics WHERE id = 'song-1'")
+            .query("SELECT translationLanguage FROM lyrics WHERE id = 'song-1'", emptyArray())
             .use { cursor ->
                 cursor.moveToFirst()
                 assertNull("pre-existing row must have no language", cursor.stringOrNull(0))
@@ -133,7 +134,7 @@ class MusicDatabaseMigrationTest {
         }
 
         val reopened = openWithRoom()
-        assertEquals(1, reopened.query("SELECT COUNT(*) FROM lyrics").use { it.intAt(0) })
+        assertEquals(1, reopened.query("SELECT COUNT(*) FROM lyrics", emptyArray()).use { it.intAt(0) })
         reopened.close()
     }
 
@@ -147,7 +148,7 @@ class MusicDatabaseMigrationTest {
 
         openWithRoom().close()
         val second = openWithRoom()
-        assertEquals(1, second.query("SELECT COUNT(*) FROM lyrics").use { it.intAt(0) })
+        assertEquals(1, second.query("SELECT COUNT(*) FROM lyrics", emptyArray()).use { it.intAt(0) })
         second.close()
     }
 
@@ -187,10 +188,10 @@ class MusicDatabaseMigrationTest {
         // And the data is still readable once a valid path is supplied again.
         helper.runMigrationsAndValidate(dbName, InternalDatabase.DB_VERSION, true, *migrations())
         val reopened = openWithRoom()
-        assertEquals(1, reopened.query("SELECT COUNT(*) FROM lyrics").use { it.intAt(0) })
+        assertEquals(1, reopened.query("SELECT COUNT(*) FROM lyrics", emptyArray()).use { it.intAt(0) })
         assertEquals(
             ORIGINAL_LYRICS,
-            reopened.query("SELECT lyrics FROM lyrics WHERE id = 'song-1'").use { it.stringAt(0) },
+            reopened.query("SELECT lyrics FROM lyrics WHERE id = 'song-1'", emptyArray()).use { it.stringAt(0) },
         )
         reopened.close()
     }
@@ -217,7 +218,7 @@ class MusicDatabaseMigrationTest {
         db: InternalDatabase,
         table: String,
     ): Set<String> =
-        db.query("PRAGMA table_info(`$table`)").use { cursor ->
+        db.query("PRAGMA table_info(`$table`)", emptyArray()).use { cursor ->
             val nameIndex = cursor.getColumnIndexOrThrow("name")
             buildSet {
                 while (cursor.moveToNext()) add(cursor.getString(nameIndex))
