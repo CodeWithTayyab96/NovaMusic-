@@ -8,7 +8,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -168,14 +167,24 @@ class MusicDatabaseMigrationTest {
 
         // Open as the current version WITHOUT registering any migration. Room cannot find a
         // path, so it must fail rather than quietly recreate the database.
+        //
+        // Note the structure: the assertion is OUTSIDE the try/catch. An earlier version put
+        // fail() inside the try, where its AssertionError would have been swallowed by
+        // `catch (expected: Throwable)` — the test would have passed even if the open had
+        // succeeded, which is the opposite of what it is meant to prove.
+        var openFailed = false
         try {
-            Room.databaseBuilder(context, InternalDatabase::class.java, dbName).build().use { db ->
-                db.openHelper.writableDatabase
+            val unopened =
+                Room.databaseBuilder(context, InternalDatabase::class.java, dbName).build()
+            try {
+                unopened.openHelper.writableDatabase
+            } finally {
+                unopened.close()
             }
-            fail("expected opening without a migration path to fail")
         } catch (expected: Throwable) {
-            // Expected. The point of the test is what happens to the file afterwards.
+            openFailed = true
         }
+        assertTrue("opening without a migration path must fail", openFailed)
 
         val after = dbFile()
         assertTrue("the database file must still exist after a failed open", after.exists())
