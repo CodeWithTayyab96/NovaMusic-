@@ -37,22 +37,31 @@ class MusicDatabaseMigrationTest {
     private val dbName = "novamusic-migration-test.db"
 
     /**
-     * Uses the FILESYSTEM-based constructor rather than the instrumentation one.
+     * Uses the (Instrumentation, assetsFolder, databaseClass) constructor so the test can
+     * resolve the schema JSONs from the FILESYSTEM rather than packaged assets, which do not
+     * reach a Robolectric unit test.
      *
-     * The instrumentation constructor resolves the exported schema JSONs through ASSETS, which
-     * do not reach a Robolectric unit test — every case failed with FileNotFoundException from
-     * createDatabase() even after app/schemas was added as a test assets srcDir.
-     *
-     * This constructor reads the schema directory directly. Gradle runs unit tests with the
-     * module directory (app/) as the working directory, so "schemas" resolves to app/schemas,
-     * which holds com.novamusic.app.db.InternalDatabase/<version>.json.
+     * Room 2.8 only ships two MigrationTestHelper constructors and BOTH take Instrumentation,
+     * so the Instrumentation reference is unavoidable — it is used internally to obtain a
+     * Context, but `assetsFolder` redirects the schema lookup. `schemas` is the absolute path
+     * to app/schemas, and Room reads `<assetsFolder>/<databaseClass.canonicalName>/<version>.json`,
+     * which resolves to app/schemas/com.novamusic.app.db.InternalDatabase/<version>.json.
      */
     @get:Rule
-    val helper: MigrationTestHelper =
+    val helper: MigrationTestHelper = run {
+        val schemasRoot = Paths.get("schemas").toAbsolutePath().toString()
+        // Defensive: if the next cycle fails again, this line tells us the exact path we tried
+        // rather than another round of guessing.
+        org.junit.Assert.assertTrue(
+            "schema root must exist: $schemasRoot",
+            java.io.File(schemasRoot, "com.novamusic.app.db.InternalDatabase").isDirectory,
+        )
         MigrationTestHelper(
-            Paths.get("schemas").toAbsolutePath(),
+            InstrumentationRegistry.getInstrumentation(),
+            schemasRoot,
             InternalDatabase::class.java,
         )
+    }
 
     private val context: Context get() = InstrumentationRegistry.getInstrumentation().targetContext
 
