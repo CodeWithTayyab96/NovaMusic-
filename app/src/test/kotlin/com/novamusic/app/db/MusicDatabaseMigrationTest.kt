@@ -14,6 +14,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
+import java.nio.file.Paths
 import kotlin.collections.buildSet
 
 /**
@@ -35,10 +36,21 @@ import kotlin.collections.buildSet
 class MusicDatabaseMigrationTest {
     private val dbName = "novamusic-migration-test.db"
 
+    /**
+     * Uses the FILESYSTEM-based constructor rather than the instrumentation one.
+     *
+     * The instrumentation constructor resolves the exported schema JSONs through ASSETS, which
+     * do not reach a Robolectric unit test — every case failed with FileNotFoundException from
+     * createDatabase() even after app/schemas was added as a test assets srcDir.
+     *
+     * This constructor reads the schema directory directly. Gradle runs unit tests with the
+     * module directory (app/) as the working directory, so "schemas" resolves to app/schemas,
+     * which holds com.novamusic.app.db.InternalDatabase/<version>.json.
+     */
     @get:Rule
     val helper: MigrationTestHelper =
         MigrationTestHelper(
-            InstrumentationRegistry.getInstrumentation(),
+            Paths.get("schemas").toAbsolutePath(),
             InternalDatabase::class.java,
         )
 

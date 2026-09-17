@@ -177,13 +177,6 @@ android {
         generateLocaleConfig = true
     }
 
-    sourceSets {
-        // MigrationTestHelper resolves Room's exported schema JSONs through ASSETS, not the
-        // filesystem. Without this the helper throws FileNotFoundException from
-        // createDatabase() because app/schemas is not packaged anywhere it can see.
-        getByName("test").assets.srcDir("$projectDir/schemas")
-    }
-
     testOptions {
         // Robolectric needs the merged Android resources (and the Room schema JSONs that
         // MigrationTestHelper loads from assets) to be available to unit tests.
