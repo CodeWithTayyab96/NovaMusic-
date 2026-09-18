@@ -713,3 +713,11 @@ val SpotifyLibraryPlaylistsCacheKey = stringPreferencesKey("spotify_library_play
 
 val JossRedMultimediaKey = booleanPreferencesKey("JossRedMultimedia")
 val SelectedLocalFoldersKey = stringSetPreferencesKey("selected_local_folders")
+
+// ─── AI translation (OpenRouter) ───────────────────────────────────────────────────
+// `openRouterApiKey` does NOT hold plaintext: it stores the output of
+// SecureKeyStore.encrypt(). It is cleared by removing the preference, never by writing "".
+val OpenRouterApiKeyKey = stringPreferencesKey("openRouterApiKey")
+val OpenRouterModelKey = stringPreferencesKey("openRouterModel")
+val OpenRouterBaseUrlKey = stringPreferencesKey("openRouterBaseUrl")
+val TranslationTargetLanguageKey = stringPreferencesKey("translationTargetLanguage")
