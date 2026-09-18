@@ -37,15 +37,19 @@ class MusicDatabaseMigrationTest {
     private val dbName = "novamusic-migration-test.db"
 
     /**
-     * Uses the (Instrumentation, assetsFolder, databaseClass) constructor so the test can
-     * resolve the schema JSONs from the FILESYSTEM rather than packaged assets, which do not
-     * reach a Robolectric unit test.
+     * Uses the assets-folder form of MigrationTestHelper so the schema JSONs resolve from the
+     * FILESYSTEM rather than packaged assets, which do not reach a Robolectric unit test.
      *
-     * Room 2.8 only ships two MigrationTestHelper constructors and BOTH take Instrumentation,
-     * so the Instrumentation reference is unavoidable — it is used internally to obtain a
-     * Context, but `assetsFolder` redirects the schema lookup. `schemas` is the absolute path
-     * to app/schemas, and Room reads `<assetsFolder>/<databaseClass.canonicalName>/<version>.json`,
-     * which resolves to app/schemas/com.novamusic.app.db.InternalDatabase/<version>.json.
+     * Room 2.8 ships this constructor as
+     * (Instrumentation, String assetsFolder, SupportSQLiteOpenHelper.Factory = default).
+     * There is no overload that also accepts the database class, so only two arguments are
+     * passed here. The Instrumentation is unavoidable — Room uses it for the Context — but
+     * `assetsFolder` redirects the schema lookup away from assets.
+     *
+     * `schemasRoot` is the absolute path to app/schemas. Room resolves schema files relative to
+     * it, so if this build reports "schema not found", the fix is to point assetsFolder at the
+     * package-named subdirectory (app/schemas/com.novamusic.app.db.InternalDatabase) which holds
+     * <version>.json directly. The defensive assert below prints the exact path in that case.
      */
     @get:Rule
     val helper: MigrationTestHelper = run {
@@ -56,10 +60,12 @@ class MusicDatabaseMigrationTest {
             "schema root must exist: $schemasRoot",
             java.io.File(schemasRoot, "com.novamusic.app.db.InternalDatabase").isDirectory,
         )
+        // The assets-folder form is (Instrumentation, String, SupportSQLiteOpenHelper.Factory),
+        // with the factory defaulted. There is no overload that also takes the database class,
+        // so the third argument above was rejected by the compiler and is removed.
         MigrationTestHelper(
             InstrumentationRegistry.getInstrumentation(),
             schemasRoot,
-            InternalDatabase::class.java,
         )
     }
 
