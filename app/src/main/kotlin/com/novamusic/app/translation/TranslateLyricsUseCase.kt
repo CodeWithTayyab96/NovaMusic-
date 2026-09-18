@@ -26,6 +26,12 @@ interface LyricsTranslationStore {
         translatedLyrics: String,
         language: String,
     )
+
+    /**
+     * Removes the stored translation by setting the translation columns to NULL.
+     * The original `lyrics` must remain untouched.
+     */
+    suspend fun clearTranslation(songId: String)
 }
 
 /** Supplies the provider configuration. Implemented by TranslationSettingsRepository. */

@@ -359,6 +359,13 @@ class TranslateLyricsUseCaseTest {
             // Mirrors the real store: ONLY the translation columns change.
             current = current?.copy(translatedLyrics = translatedLyrics, translationLanguage = language)
         }
+
+        override suspend fun clearTranslation(songId: String) {
+            saves++
+            savedText = null
+            savedLanguage = null
+            current = current?.copy(translatedLyrics = null, translationLanguage = null)
+        }
     }
 
     private class FakeConfig(
