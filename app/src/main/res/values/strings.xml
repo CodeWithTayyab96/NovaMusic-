@@ -618,6 +618,16 @@ NovaMusic will only extract your token, and everything else is stored locally.</
     <string name="translate">Translate</string>
     <string name="lyrics_view_original">Original</string>
     <string name="lyrics_view_translated">Translated</string>
+    <string name="ai_translation">AI Translation</string>
+    <string name="ai_translation_summary">Translate lyrics with an OpenRouter model</string>
+    <string name="openrouter_api_key">OpenRouter API key</string>
+    <string name="openrouter_model">Model</string>
+    <string name="translation_target_language">Target language</string>
+    <string name="api_key_not_configured">Not configured</string>
+    <string name="api_key_configured">Configured</string>
+    <string name="api_key_saved">API key saved</string>
+    <string name="api_key_save_failed">Could not save the API key. Your previous key was kept.</string>
+    <string name="api_key_cleared">API key removed</string>
     <string name="language_label">Language</string>
     <string name="lyrics">Lyrics</string>
     <string name="translation_success">Translation saved</string>
