@@ -25,7 +25,6 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class RoomLyricsTranslationStoreTest {
-    private val dbName = "novamusic-store-test.db"
     private lateinit var context: Context
     private lateinit var delegate: InternalDatabase
     private lateinit var database: MusicDatabase
@@ -42,7 +41,11 @@ class RoomLyricsTranslationStoreTest {
         context = InstrumentationRegistry.getInstrumentation().targetContext
         delegate =
             Room
-                .databaseBuilder(context, InternalDatabase::class.java, dbName)
+                // In-memory on purpose: a file-backed database made Robolectric's per-test temp
+                // directory teardown fail (NoSuchFileException, and a crashed test worker on the
+                // x86_64 unit-test variant). Nothing here needs a file — the assertions are about
+                // UPDATE semantics, not persistence to disk.
+                .inMemoryDatabaseBuilder(context, InternalDatabase::class.java)
                 // Test only — Robolectric runs on the main thread.
                 .allowMainThreadQueries()
                 .build()
@@ -54,7 +57,6 @@ class RoomLyricsTranslationStoreTest {
     @After
     fun tearDown() {
         runCatching { delegate.openHelper.close() }
-        runCatching { context.deleteDatabase(dbName) }
     }
 
     // ─────────────────────────── helpers ───────────────────────────
