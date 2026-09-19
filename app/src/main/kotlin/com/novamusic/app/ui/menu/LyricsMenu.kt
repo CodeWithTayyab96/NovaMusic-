@@ -59,8 +59,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
-import me.bush.translator.Translator
-import me.bush.translator.Language
 import com.novamusic.app.utils.TranslatorLanguages
 import com.novamusic.app.utils.TranslatorLang
 import androidx.compose.runtime.produceState
@@ -469,7 +467,6 @@ fun LyricsMenu(
                     )
                 } else {
                     TextButton(onClick = {
-                        val languageCode = selectedLanguageCode
                         val languageName = selectedLanguageName
 
                         // Reuse a stored translation for the SAME language rather than spending
@@ -492,31 +489,24 @@ fun LyricsMenu(
                         val inputText = textFieldValue.text
                         coroutineScope.launch {
                             try {
-                                val lang = try {
-                                    Language(languageCode)
-                                } catch (e: Exception) {
-                                    try {
-                                        Language(languageName)
-                                    } catch (_: Exception) {
-                                        null
-                                    }
-                                }
-
-                                if (lang == null) {
+                                // The provider takes an arbitrary target-language name, so
+                                // there is no language enum left to validate against. The use
+                                // case rejects a blank language anyway; this just avoids
+                                // starting a request we know is invalid.
+                                if (languageName.isBlank()) {
                                     Toast.makeText(
                                         context,
-                                        "Unsupported language: $languageName",
+                                        context.getString(R.string.translation_failed) +
+                                            ": no target language",
                                         Toast.LENGTH_SHORT
                                     ).show()
                                     return@launch
                                 }
 
                                 val translatedLyrics = withContext(Dispatchers.IO) {
-                                    val translator = Translator()
-
                                     val lines = inputText.split("\n")
                                     val tsRegex =
-                                        Regex("^((?:\\[[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?\\])+)")
+                                        Regex("^((?:\\[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?\\])+)")
                                     val contents = mutableListOf<String?>()
                                     val stampsFor = mutableListOf<String?>()
 
@@ -535,74 +525,34 @@ fun LyricsMenu(
                                         }
                                     }
 
-                                    val translatableIndices =
-                                        contents.mapIndexedNotNull { idx, c -> if (c != null) idx else null }
-                                    val translatedMap = mutableMapOf<Int, String>()
+                                    // The model only ever sees plain text: one string per line,
+                                    // no timestamps and no separator. Reuse of a stored
+                                    // translation, provider choice, response validation and
+                                    // persistence all live behind the use case, and a failed
+                                    // translation can never degrade into one request per line.
+                                    val translated =
+                                        viewModel
+                                            .translateLyrics(
+                                                songId = mediaMetadataProvider().id,
+                                                lines = contents.map { it.orEmpty() },
+                                                targetLanguage = languageName,
+                                            )
+                                            .getOrThrow()
 
-                                    if (translatableIndices.isNotEmpty()) {
-                                        var sep = "<<<SEP-${UUID.randomUUID()}>>>"
-                                        while (contents.any { it?.contains(sep) == true }) {
-                                            sep = "<<<SEP-${UUID.randomUUID()}>>>"
-                                        }
-
-                                        val maxCharsPerRequest = 4000
-                                        val maxItemsPerBatch = 50
-
-                                        var cursor = 0
-                                        while (cursor < translatableIndices.size) {
-                                            var currentChars = 0
-                                            val batchIndices = mutableListOf<Int>()
-                                            while (cursor < translatableIndices.size && batchIndices.size < maxItemsPerBatch) {
-                                                val idx = translatableIndices[cursor]
-                                                val pieceLen = contents[idx]!!.length
-                                                if (batchIndices.isEmpty() || currentChars + pieceLen + sep.length <= maxCharsPerRequest) {
-                                                    batchIndices.add(idx)
-                                                    currentChars += pieceLen + sep.length
-                                                    cursor++
-                                                } else break
-                                            }
-
-                                            val batchTexts = batchIndices.map { contents[it]!! }
-                                            val joined = batchTexts.joinToString(separator = sep)
-                                            val translatedJoined =
-                                                translator.translateBlocking(
-                                                    joined,
-                                                    lang
-                                                ).translatedText
-
-                                            val parts = translatedJoined.split(sep)
-                                            if (parts.size == batchTexts.size) {
-                                                for (i in batchIndices.indices) {
-                                                    translatedMap[batchIndices[i]] = parts[i]
-                                                }
-                                            } else {
-                                                // Never fall back to one request per line. That
-                                                // turned a single batch into up to 50 rapid calls
-                                                // and is what produced HTTP 429. Failing the
-                                                // whole operation costs one request and leaves the
-                                                // original untouched, which is strictly better than
-                                                // hammering a rate-limited endpoint.
-                                                throw IllegalStateException(
-                                                    "Translation response could not be mapped back " +
-                                                        "to ${batchTexts.size} line(s) (got " +
-                                                        "${parts.size}); refusing to issue one " +
-                                                        "request per line",
-                                                )
-                                            }
-                                        }
-                                    }
-
+                                    // Rebuild from the ORIGINAL timestamps by index, so the
+                                    // model is never responsible for timing information.
                                     val out = mutableListOf<String>()
                                     for (i in contents.indices) {
                                         val stamp = stampsFor[i]
-                                        val c = contents[i]
-                                        if (c == null) {
+                                        if (contents[i] == null) {
                                             if (stamp != null) out.add(stamp) else out.add("")
                                         } else {
-                                            val translatedText = translatedMap[i] ?: c
-                                            if (stamp != null) out.add("$stamp $translatedText") else out.add(
-                                                translatedText
-                                            )
+                                            val translatedText = translated[i]
+                                            if (stamp != null) {
+                                                out.add("$stamp $translatedText")
+                                            } else {
+                                                out.add(translatedText)
+                                            }
                                         }
                                     }
 
