@@ -177,6 +177,13 @@ android {
         generateLocaleConfig = true
     }
 
+    sourceSets {
+        // Room's Android MigrationTestHelper loads schemas with assets.open(...), so a
+        // filesystem path will not work — app/schemas must be packaged into the test APK's
+        // assets and referenced by a RELATIVE asset path.
+        getByName("test").assets.srcDir("$projectDir/schemas")
+    }
+
     testOptions {
         // Robolectric needs the merged Android resources (and the Room schema JSONs that
         // MigrationTestHelper loads from assets) to be available to unit tests.

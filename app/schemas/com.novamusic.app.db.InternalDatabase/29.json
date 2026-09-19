@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 29,
-    "identityHash": "e6f386216e8bab8f394754c48b84a5d1",
+    "identityHash": "56ffe4b622c413499b26c289d4a46f54",
     "entities": [
       {
         "tableName": "song",
@@ -774,7 +774,7 @@
       },
       {
         "tableName": "lyrics",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `lyrics` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `lyrics` TEXT NOT NULL, `translatedLyrics` TEXT, `translationLanguage` TEXT, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -787,6 +787,16 @@
             "columnName": "lyrics",
             "affinity": "TEXT",
             "notNull": true
+          },
+          {
+            "fieldPath": "translatedLyrics",
+            "columnName": "translatedLyrics",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "translationLanguage",
+            "columnName": "translationLanguage",
+            "affinity": "TEXT"
           }
         ],
         "primaryKey": {
@@ -1078,7 +1088,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e6f386216e8bab8f394754c48b84a5d1')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '56ffe4b622c413499b26c289d4a46f54')"
     ]
   }
 }

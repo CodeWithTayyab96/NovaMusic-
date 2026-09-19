@@ -53,13 +53,10 @@ class MusicDatabaseMigrationTest {
      */
     @get:Rule
     val helper: MigrationTestHelper = run {
-        val schemasRoot = Paths.get("schemas").toAbsolutePath().toString()
-        // Defensive: if the next cycle fails again, this line tells us the exact path we tried
-        // rather than another round of guessing.
-        org.junit.Assert.assertTrue(
-            "schema root must exist: $schemasRoot",
-            java.io.File(schemasRoot, "com.novamusic.app.db.InternalDatabase").isDirectory,
-        )
+        // A RELATIVE ASSET path, not a filesystem path: Room's Android helper resolves these
+        // through assets.open("<assetsFolder>/<version>.json"). app/schemas is added as a test
+        // assets srcDir in build.gradle.kts, so the package-named subdirectory is reachable here.
+        val schemasRoot = "com.novamusic.app.db.InternalDatabase"
         // The assets-folder form is (Instrumentation, String, SupportSQLiteOpenHelper.Factory),
         // with the factory defaulted. There is no overload that also takes the database class,
         // so the third argument above was rejected by the compiler and is removed.

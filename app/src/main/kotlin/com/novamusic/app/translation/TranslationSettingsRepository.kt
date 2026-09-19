@@ -18,6 +18,7 @@ import com.novamusic.app.utils.dataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import androidx.datastore.preferences.core.edit
 
 /** Echo's current default. Used as a STARTING default only — the model is user-configurable. */
 const val DEFAULT_OPENROUTER_MODEL = "google/gemini-2.5-flash-lite"
