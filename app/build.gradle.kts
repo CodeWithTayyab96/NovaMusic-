@@ -179,9 +179,14 @@ android {
 
     sourceSets {
         // Room's Android MigrationTestHelper loads schemas with assets.open(...), so a
-        // filesystem path will not work — app/schemas must be packaged into the test APK's
-        // assets and referenced by a RELATIVE asset path.
+        // filesystem path will not work — the schemas must be packaged as assets and
+        // referenced by a RELATIVE asset path.
+        //
+        // Bound to the DEBUG source set deliberately: Robolectric unit tests read the merged
+        // debug variant assets, and the "test" source set's assets do NOT reach them. Keeping it
+        // on debug only means the exported schemas are never shipped in a release APK.
         getByName("test").assets.srcDir("$projectDir/schemas")
+        getByName("debug").assets.srcDir("$projectDir/schemas")
     }
 
     testOptions {
