@@ -16,8 +16,6 @@ import com.novamusic.app.utils.dataStore
 import com.my.kizzy.rpc.KizzyRPC
 import com.my.kizzy.rpc.RpcImage
 import timber.log.Timber
-import me.bush.translator.Translator
-import me.bush.translator.Language
 
 
 class DiscordRPC(
@@ -34,7 +32,6 @@ class DiscordRPC(
         private const val logtag = "DiscordRPC"
     }
 
-    private val translationCache: MutableMap<String, String> = mutableMapOf()
     private var lastSongId: String? = null
 
     private fun pickSourceValue(pref: String, song: Song?, default: String): String = when (pref) {
@@ -82,7 +79,6 @@ class DiscordRPC(
         val calculatedStartTime = currentTime - currentPlaybackTimeMillis
 
         if (lastSongId != song.song.id) {
-            translationCache.clear()
             DiscordImageResolver.clearCache()
             lastSongId = song.song.id
         }
@@ -100,63 +96,19 @@ class DiscordRPC(
         }
 
 
-        // --- Translator Integration with Cache ---
-        val translatorEnabled = context.dataStore[EnableTranslatorKey] ?: false
-        val translatedMap = mutableMapOf<String, String>()
-
-        if (translatorEnabled) {
-            val contextList = (context.dataStore[TranslatorContextsKey] ?: "{song}")
-                .split(",")
-                .map { it.trim() }
-            val targetLang = context.dataStore[TranslatorTargetLangKey] ?: "ENGLISH"
-
-            val rawMap = mapOf(
-                "{song}" to song.song.title,
-                "{artist}" to song.artists.joinToString { it.name },
-                "{album}" to (song.song.albumName ?: song.album?.title ?: "")
-            )
-
-            try {
-                val translator = Translator()
-                for (ctx in contextList) {
-                    val value = rawMap[ctx]
-                    if (!value.isNullOrBlank()) {
-                        val cacheKey = "${song.song.id}:$ctx:$targetLang"
-                        val translated = translationCache[cacheKey]
-
-                        if (translated != null) {
-                            translatedMap[ctx] = translated
-                        } else {
-                            try {
-                                val result = translator.translateBlocking(value, Language.valueOf(targetLang.uppercase()))
-                                translatedMap[ctx] = result.translatedText
-                                translationCache[cacheKey] = result.translatedText
-                            } catch (e: Exception) {
-                                Timber.tag(logtag).e(e, "Translation failed for $ctx")
-                                translatedMap[ctx] = value // fallback original
-                                translationCache[cacheKey] = value
-                            }
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Timber.tag(logtag).e(e, "Translator init failed")
-            }
-        }
-        // --- End Translator ---
 
         val activityName = when (namePref.uppercase()) {
-            "ARTIST" -> translatedMap["{artist}"] ?: pickSourceValue(namePref, song, context.getString(R.string.app_name))
-            "ALBUM" -> translatedMap["{album}"] ?: pickSourceValue(namePref, song, context.getString(R.string.app_name))
-            "SONG" -> translatedMap["{song}"] ?: pickSourceValue(namePref, song, context.getString(R.string.app_name))
+            "ARTIST" -> pickSourceValue(namePref, song, context.getString(R.string.app_name))
+            "ALBUM" -> pickSourceValue(namePref, song, context.getString(R.string.app_name))
+            "SONG" -> pickSourceValue(namePref, song, context.getString(R.string.app_name))
             "APP" -> context.getString(R.string.app_name)
             else -> pickSourceValue(namePref, song, context.getString(R.string.app_name))
         }
 
         var activityDetails = when (detailsPref.uppercase()) {
-            "ARTIST" -> translatedMap["{artist}"] ?: pickSourceValue(detailsPref, song, song.song.title)
-            "ALBUM" -> translatedMap["{album}"] ?: pickSourceValue(detailsPref, song, song.song.title)
-            "SONG" -> translatedMap["{song}"] ?: pickSourceValue(detailsPref, song, song.song.title)
+            "ARTIST" -> pickSourceValue(detailsPref, song, song.song.title)
+            "ALBUM" -> pickSourceValue(detailsPref, song, song.song.title)
+            "SONG" -> pickSourceValue(detailsPref, song, song.song.title)
             "APP" -> context.getString(R.string.app_name)
             else -> pickSourceValue(detailsPref, song, song.song.title)
         }
@@ -167,9 +119,9 @@ class DiscordRPC(
         }
 
         var activityState = when (statePref.uppercase()) {
-            "ARTIST" -> translatedMap["{artist}"] ?: pickSourceValue(statePref, song, song.artists.joinToString { it.name })
-            "ALBUM" -> translatedMap["{album}"] ?: pickSourceValue(statePref, song, song.artists.joinToString { it.name })
-            "SONG" -> translatedMap["{song}"] ?: pickSourceValue(statePref, song, song.artists.joinToString { it.name })
+            "ARTIST" -> pickSourceValue(statePref, song, song.artists.joinToString { it.name })
+            "ALBUM" -> pickSourceValue(statePref, song, song.artists.joinToString { it.name })
+            "SONG" -> pickSourceValue(statePref, song, song.artists.joinToString { it.name })
             "APP" -> context.getString(R.string.app_name)
             else -> pickSourceValue(statePref, song, song.artists.joinToString { it.name })
         }
@@ -297,13 +249,13 @@ class DiscordRPC(
 
         val largeTextSource = (context.dataStore[DiscordLargeTextSourceKey] ?: "album").lowercase()
         val resolvedLargeText = when (largeTextSource) {
-            "song" -> translatedMap["{song}"] ?: song.song.title
-            "artist" -> translatedMap["{artist}"] ?: song.artists.firstOrNull()?.name
-            "album" -> translatedMap["{album}"] ?: song.song.albumName ?: song.album?.title ?: song.song.title
+            "song" -> song.song.title
+            "artist" -> song.artists.firstOrNull()?.name
+            "album" -> song.song.albumName ?: song.album?.title ?: song.song.title
             "app" -> context.getString(R.string.app_name)
             "custom" -> (context.dataStore[DiscordLargeTextCustomKey] ?: "").ifBlank { null }
             "dontshow" -> null
-            else -> translatedMap["{album}"] ?: song.song.albumName ?: song.album?.title
+            else -> song.song.albumName ?: song.album?.title
         }
 
         // Derive small text from small image type, prefer translated values when available
@@ -311,12 +263,12 @@ class DiscordRPC(
             context.getString(R.string.discord_paused)
         } else {
             val baseSmallText = when (smallImageTypePref.lowercase()) {
-                "song" -> translatedMap["{song}"] ?: song.song.title
-                "artist" -> translatedMap["{artist}"] ?: song.artists.firstOrNull()?.name
-                "thumbnail", "album" -> translatedMap["{album}"] ?: song.song.albumName ?: song.album?.title
+                "song" -> song.song.title
+                "artist" -> song.artists.firstOrNull()?.name
+                "thumbnail", "album" -> song.song.albumName ?: song.album?.title
                 "appicon", "app" -> context.getString(R.string.app_name)
                 "custom" -> song.artists.firstOrNull()?.name
-                else -> translatedMap["{artist}"] ?: song.artists.firstOrNull()?.name
+                else -> song.artists.firstOrNull()?.name
             }
             "$baseSmallText on NovaMusic"
         }

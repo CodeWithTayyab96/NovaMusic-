@@ -54,7 +54,6 @@ glance = "1.2.0-rc01"
 composeMarkdown = "0.7.2"
 kotlinxSerializationJson = "1.8.0"
 m3color = "2025.4"
-translator = "1.1.1"
 
 [libraries]
 guava = { module = "com.google.guava:guava", version.ref = "guava" }
@@ -157,7 +156,6 @@ logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-intercep
 
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 m3color = { module = "com.github.Kyant0:m3color", version.ref = "m3color" }
-translator = { module = "com.github.therealbush:translator", version.ref = "translator" }
 lifecycle-process = { module = "androidx.lifecycle:lifecycle-process", version.ref = "lifecycle" }
 
 

@@ -306,7 +306,6 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.ktor.client.mock)
-    implementation(libs.translator)
     implementation(libs.lifecycle.process)
     implementation(libs.lifecycle.runtime.compose)
     implementation("androidx.compose.material3.adaptive:adaptive:1.2.0")
