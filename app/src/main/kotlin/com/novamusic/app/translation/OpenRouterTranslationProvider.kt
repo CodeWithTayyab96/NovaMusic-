@@ -12,6 +12,7 @@
 package com.novamusic.app.translation
 
 import io.ktor.client.HttpClient
+import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.header
@@ -50,18 +51,24 @@ import java.net.UnknownHostException
 class OpenRouterTranslationProvider(
     private val configProvider: suspend () -> TranslationConfig,
     private val maxCharsPerRequest: Int = LyricsTranslationContract.MAX_CHARS_PER_REQUEST,
+    private val engine: HttpClientEngine? = null,
 ) : TranslationProvider {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     // Explicit timeouts. A bare HttpClient() would inherit engine defaults — a 10s socket
     // timeout, which is how the updater's large download used to fail.
-    private val client = HttpClient {
-        install(HttpTimeout) {
-            connectTimeoutMillis = 15_000
-            requestTimeoutMillis = 60_000
-            socketTimeoutMillis = 60_000
+    private val client: HttpClient =
+        if (engine != null) {
+            HttpClient(engine)
+        } else {
+            HttpClient {
+                install(HttpTimeout) {
+                    connectTimeoutMillis = 15_000
+                    requestTimeoutMillis = 60_000
+                    socketTimeoutMillis = 60_000
+                }
+            }
         }
-    }
 
     override fun isConfigured(): Boolean = true
 
