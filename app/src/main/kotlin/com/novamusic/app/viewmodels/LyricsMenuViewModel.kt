@@ -15,6 +15,7 @@ import com.novamusic.app.db.entities.LyricsEntity
 import com.novamusic.app.lyrics.LyricsHelper
 import com.novamusic.app.lyrics.LyricsResult
 import com.novamusic.app.models.MediaMetadata
+import com.novamusic.app.translation.TranslateLyricsUseCase
 import com.novamusic.app.utils.NetworkConnectivityObserver
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +35,7 @@ constructor(
     private val lyricsHelper: LyricsHelper,
     val database: MusicDatabase,
     private val networkConnectivity: NetworkConnectivityObserver,
+    private val translateLyricsUseCase: TranslateLyricsUseCase,
 ) : ViewModel() {
     private var job: Job? = null
     val results = MutableStateFlow(emptyList<LyricsResult>())
@@ -144,4 +146,24 @@ constructor(
             }
         }
     }
+
+    /**
+     * Translates plain lyric lines through the provider stack.
+     *
+     * [lines] carry no timestamps — the caller strips them and reattaches them by index from
+     * the original, so the model never produces timing information. Reuse of a stored
+     * translation, provider selection, validation and persistence all happen behind the use
+     * case; the caller only sees the resulting lines or a structured [TranslationError].
+     */
+    suspend fun translateLyrics(
+        songId: String,
+        lines: List<String>,
+        targetLanguage: String,
+    ): Result<List<String>> =
+        translateLyricsUseCase(
+            songId = songId,
+            lines = lines,
+            targetLanguage = targetLanguage,
+        ).map { outcome -> outcome.lines }
+
 }
