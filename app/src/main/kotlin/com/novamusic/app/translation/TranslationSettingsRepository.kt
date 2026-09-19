@@ -50,7 +50,7 @@ data class TranslationConfig(
  */
 class TranslationSettingsRepository(
     private val context: Context,
-) {
+) : TranslationConfigSource {
     /** Live configuration; decrypts the key lazily on each emission. */
     val config: Flow<TranslationConfig> =
         context.dataStore.data.map { prefs ->
@@ -67,6 +67,9 @@ class TranslationSettingsRepository(
         }
 
     suspend fun currentConfig(): TranslationConfig = config.first()
+
+    /** Satisfies TranslationConfigSource so the use case depends on the interface. */
+    override suspend fun current(): TranslationConfig = currentConfig()
 
     /**
      * Encrypts and stores [rawKey]; a blank value clears the stored key.

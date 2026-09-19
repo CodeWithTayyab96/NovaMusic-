@@ -17,6 +17,7 @@ import io.ktor.client.plugins.timeout
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -47,9 +48,7 @@ import java.net.UnknownHostException
  *   without rebuilding the provider. Never logged, never included in an error.
  */
 class OpenRouterTranslationProvider(
-    private val apiKeyProvider: () -> String?,
-    private val baseUrlProvider: () -> String,
-    private val modelProvider: () -> String,
+    private val configProvider: suspend () -> TranslationConfig,
     private val maxCharsPerRequest: Int = LyricsTranslationContract.MAX_CHARS_PER_REQUEST,
 ) : TranslationProvider {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -64,10 +63,11 @@ class OpenRouterTranslationProvider(
         }
     }
 
-    override fun isConfigured(): Boolean = !apiKeyProvider().isNullOrBlank()
+    override fun isConfigured(): Boolean = true
 
     override suspend fun translate(request: TranslationRequest): Result<TranslationResult> {
-        val apiKey = apiKeyProvider()
+        val config = configProvider()
+        val apiKey = config.apiKey
         if (apiKey.isNullOrBlank()) {
             return failure(TranslationError.MissingApiKey)
         }
@@ -88,6 +88,7 @@ class OpenRouterTranslationProvider(
                     targetLanguage = request.targetLanguage,
                     sourceLanguage = request.sourceLanguage,
                     apiKey = apiKey,
+                    config = config,
                 )
             // Any chunk failing fails the WHOLE translation. Never degrade to per-line calls.
             val lines = translated.getOrElse { return Result.failure(it) }
@@ -110,10 +111,11 @@ class OpenRouterTranslationProvider(
         targetLanguage: String,
         sourceLanguage: String?,
         apiKey: String,
+        config: TranslationConfig,
     ): Result<List<String>> {
         val body =
             buildJsonObject {
-                put("model", modelProvider())
+                put("model", config.model)
                 put("temperature", LyricsTranslationContract.TEMPERATURE)
                 put(
                     "messages",
@@ -126,9 +128,9 @@ class OpenRouterTranslationProvider(
                 )
             }
 
-        val response =
+        val response: HttpResponse =
             try {
-                client.post(baseUrlProvider()) {
+                client.post(config.baseUrl) {
                     contentType(ContentType.Application.Json)
                     header("Authorization", "Bearer $apiKey")
                     // OpenRouter uses these for attribution; they are not secrets.
