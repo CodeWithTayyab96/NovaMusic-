@@ -12,6 +12,11 @@ package com.novamusic.app.ui.screens.settings
 import android.content.Context
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.Icon
+import com.novamusic.app.ui.component.IconButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.navigation.NavController
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -24,6 +29,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import com.novamusic.app.ui.utils.backToMain
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -49,10 +57,12 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun AiTranslationSettings(
-    context: Context,
-    repository: TranslationSettingsRepository,
+    navController: NavController,
+    scrollBehavior: TopAppBarScrollBehavior,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    val repository = remember { TranslationSettingsRepository(context) }
     val scope = rememberCoroutineScope()
     val config by repository.config.collectAsStateWithLifecycle(initialValue = TranslationConfig())
 
@@ -63,6 +73,22 @@ fun AiTranslationSettings(
     var message: String? by remember { mutableStateOf(null) }
 
     Column(modifier = modifier) {
+        TopAppBar(
+            title = { Text(stringResource(R.string.ai_translation)) },
+            navigationIcon = {
+                IconButton(
+                    onClick = navController::navigateUp,
+                    onLongClick = navController::backToMain,
+                ) {
+                    Icon(
+                        painterResource(R.drawable.arrow_back),
+                        contentDescription = null,
+                    )
+                }
+            },
+            scrollBehavior = scrollBehavior,
+        )
+
         PreferenceEntry(
             title = { Text(stringResource(R.string.openrouter_api_key)) },
             subtitle = {

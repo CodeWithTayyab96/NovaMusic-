@@ -79,6 +79,7 @@ import com.novamusic.app.ui.screens.settings.DiscordLoginScreen
 import com.novamusic.app.ui.screens.settings.DiscordSettings
 import com.novamusic.app.ui.screens.settings.DebugSettings
 import com.novamusic.app.ui.screens.settings.IntegrationScreen
+import com.novamusic.app.ui.screens.settings.AiTranslationSettings
 import com.novamusic.app.ui.screens.settings.LastFMSettings
 import com.novamusic.app.ui.screens.settings.MusicTogetherScreen
 import com.novamusic.app.ui.screens.settings.PalettePickerScreen
@@ -376,6 +377,9 @@ fun NavGraphBuilder.navigationBuilder(
     }
     composable("settings/lastfm") {
         LastFMSettings(navController, scrollBehavior)
+    }
+    composable("settings/ai_translation") {
+        AiTranslationSettings(navController, scrollBehavior)
     }
     composable("settings/discord/experimental") {
         com.novamusic.app.ui.screens.settings.DiscordExperimental(navController)

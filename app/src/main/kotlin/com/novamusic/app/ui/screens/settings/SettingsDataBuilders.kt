@@ -373,6 +373,14 @@ fun buildInternalItems(
             onClick = { resetSearch(); navController.navigate("settings/lastfm") },
         ),
         SettingsItem(
+            icon = painterResource(R.drawable.translate),
+            title = stringResource(R.string.ai_translation),
+            subtitle = stringResource(R.string.ai_translation_summary),
+            accentColor = MaterialTheme.colorScheme.secondary,
+            keywords = listOf("ai", "translation", "translate", "openrouter", "lyrics"),
+            onClick = { resetSearch(); navController.navigate("settings/ai_translation") },
+        ),
+        SettingsItem(
             icon = painterResource(R.drawable.fire),
             title = stringResource(R.string.music_together),
             subtitle = stringResource(R.string.integration),
