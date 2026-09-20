@@ -144,10 +144,15 @@ fun SettingsScreen(
         }
     }
 
-    val internalGroup = if (filteredInternalItems.isNotEmpty()) {
+    // Mirror the convention used by the other sections: show every item when the search box is
+    // empty, and the filtered set while searching. This group used to be built from
+    // filteredInternalItems only AND passed as null unless a query was typed, which made the AI
+    // Translation / OpenRouter entry invisible in the normal Settings screen.
+    val internalItemsToShow = if (queryText.isBlank()) internalItems else filteredInternalItems
+    val internalGroup = if (internalItemsToShow.isNotEmpty()) {
         SettingsGroup(
             title = stringResource(R.string.internal_subcategory_settings),
-            items = filteredInternalItems,
+            items = internalItemsToShow,
         )
     } else null
 
@@ -155,7 +160,7 @@ fun SettingsScreen(
         quickActions = if (queryText.isBlank()) quickActions else filteredQuickActions,
         integrations = if (queryText.isBlank()) integrationActions else filteredIntegrations,
         groups = if (queryText.isBlank()) settingsGroups else filteredGroups,
-        internalGroup = if (queryText.isNotBlank()) internalGroup else null,
+        internalGroup = internalGroup,
         showPermissionBanner = shouldShowPermissionHint,
         showUpdateBanner = hasUpdate,
         latestVersion = latestVersionName,
