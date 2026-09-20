@@ -49,8 +49,9 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
 import org.json.JSONObject
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.IOException
+import java.io.FileInputStream
 import java.io.InputStreamReader
 import java.io.PushbackReader
 import java.io.Reader
@@ -310,6 +311,42 @@ class BackupRestoreViewModel @Inject constructor(
                                 name == "${InternalDatabase.DB_NAME}-journal"
                     }
 
+                // --- Stage and validate the incoming database BEFORE touching the live one. ---
+                //
+                // The live database used to be deleted and the archive streamed straight into its
+                // place, so any failure during that copy (corrupt archive, full disk, process
+                // death, unopenable file) left the user with no database and nothing to fall back
+                // to. The incoming database is now fully extracted to a staging file and proven
+                // readable and compatible first; only then is the live one replaced. Any rejection
+                // below leaves the existing library completely untouched.
+                val stagedDb = File(context.cacheDir, STAGED_RESTORE_DB_NAME)
+                runCatching { if (stagedDb.exists()) stagedDb.delete() }
+
+                runCatching {
+                    context.applicationContext.contentResolver.openInputStream(uri)?.use { stream ->
+                        stream.zipInputStream().use { zip ->
+                            var entry = zip.nextEntry
+                            while (entry != null) {
+                                if (entry.name == InternalDatabase.DB_NAME) {
+                                    FileOutputStream(stagedDb).use { out -> zip.copyTo(out) }
+                                    break
+                                }
+                                entry = zip.nextEntry
+                            }
+                        }
+                    }
+                }.getOrElse { throw IOException("Could not extract the database from this backup", it) }
+
+                val stagedInfo = inspectStagedDatabase(stagedDb)
+                if (!isAcceptableStagedDatabase(stagedInfo, InternalDatabase.DB_VERSION)) {
+                    runCatching { stagedDb.delete() }
+                    throw IOException(
+                        "This backup has no readable, compatible NovaMusic database " +
+                            "(reported version: ${stagedInfo?.version}). " +
+                            "Your current library was left unchanged.",
+                    )
+                }
+
                 val totalUnits = 1 + 1 + restoreEntries.size
                 val unitSpan = 100f / totalUnits.coerceAtLeast(1)
                 var completedUnits = 0
@@ -354,13 +391,14 @@ class BackupRestoreViewModel @Inject constructor(
                                 "${InternalDatabase.DB_NAME}-shm",
                                 "${InternalDatabase.DB_NAME}-journal" -> {
                                     emit(context.getString(R.string.restore_step_restoring_file, name), indeterminate = true)
+                                    // A sidecar from the previous database must never be paired
+                                    // with the restored one; SQLite recreates these on next open.
+                                    val sidecar = context.getDatabasePath(name)
+                                    if (sidecar.exists()) sidecar.delete()
+                                    // Validated above; copy it into place rather than streaming
+                                    // the archive directly over the live database.
                                     val dbFile = context.getDatabasePath(name)
-                                    if (dbFile.exists()) {
-                                        dbFile.delete()
-                                    }
-                                    FileOutputStream(dbFile).use { out ->
-                                        zip.copyTo(out)
-                                    }
+                                    stagedDb.copyTo(dbFile, overwrite = true)
                                 }
                             }
                             completedUnits++
@@ -368,6 +406,8 @@ class BackupRestoreViewModel @Inject constructor(
                         }
                     }
                 }
+
+                runCatching { stagedDb.delete() }
 
                 emitProgress(
                     title = title,
