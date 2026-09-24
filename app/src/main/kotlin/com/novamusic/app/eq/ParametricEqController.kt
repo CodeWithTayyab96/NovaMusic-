@@ -5,10 +5,18 @@
  * Ported from Echo Music:
  *   playback/src/main/kotlin/echo/music/iad1tya/eq/EqualizerService.kt
  * Adapted for NovaMusic: Echo's EqualizerService kept a list of processors registered from
- * the outside and had to buffer a "pending" profile until one showed up. Here the processor
- * is owned by this controller, so there is exactly one instance, it always exists, and the
- * pending-profile dance is unnecessary. The controller also observes DataStore, which is
- * what keeps the processor in sync when the setting changes from anywhere else in the app.
+ * the outside and had to buffer a "pending" profile until one showed up. Here the controller
+ * creates the processors itself, so it always has a live one to configure and there is no
+ * pending-profile dance. The controller also observes DataStore, which keeps every processor
+ * in sync when the setting changes from anywhere in the app.
+ *
+ * One processor per audio sink, not one per app. NovaMusic's CrossfadeAudio builds a second
+ * ExoPlayer (overlapPlayerFactory in MusicService) that runs at the same time as the primary
+ * one during a crossfade. Handing both sinks the same processor instance would mean two
+ * threads calling configure() and queueInput() on one set of biquad delay lines — the second
+ * configure() would silently retune the first player, and the two streams would interleave
+ * through shared filter state. Each sink therefore gets its own instance, and the controller
+ * fans the current curve out to all of them.
  */
 
 package com.novamusic.app.eq
@@ -19,6 +27,8 @@ import com.novamusic.app.eq.data.ParametricEqParser
 import com.novamusic.app.eq.data.ParametricEqRepository
 import com.novamusic.app.eq.data.ParametricEqState
 import com.novamusic.app.eq.data.SavedParametricEqProfile
+import java.lang.ref.WeakReference
+import java.util.concurrent.CopyOnWriteArrayList
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -32,12 +42,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 
 /**
- * The single owner of the parametric EQ processor.
+ * Owns the parametric EQ processors and keeps them in step with the stored curve.
  *
- * [MusicService] puts [processor] into its audio chain; the settings UI drives everything
- * else through this class. The DataStore flow is collected here so a change made anywhere —
- * the settings screen, a restored backup — reaches the audio thread without the UI and the
- * service having to know about each other.
+ * [MusicService] asks for one processor per audio sink via [createProcessor]; the settings UI
+ * drives everything else through this class.
  */
 @Singleton
 class ParametricEqController
@@ -45,8 +53,15 @@ class ParametricEqController
 constructor(
     private val repository: ParametricEqRepository,
 ) {
-    /** The processor instance to install in the ExoPlayer audio chain. */
-    val processor = ParametricEqualizerAudioProcessor()
+    /**
+     * Every processor currently installed in an audio chain.
+     *
+     * Held weakly on purpose: the audio sink holds the only strong reference, so when a
+     * player is released (the crossfade overlap player is created per transition) the entry
+     * clears itself instead of pinning the player for the lifetime of the app.
+     */
+    private val processors =
+        CopyOnWriteArrayList<WeakReference<ParametricEqualizerAudioProcessor>>()
 
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob()) + Dispatchers.Default
 
@@ -69,13 +84,39 @@ constructor(
         }
     }
 
+    /**
+     * A fresh processor for one audio sink, seeded with the curve that is in force right now.
+     *
+     * Call this once per `createRenderersFactory()`. The returned instance is tracked so
+     * later profile changes reach it.
+     */
+    fun createProcessor(): ParametricEqualizerAudioProcessor {
+        val processor = ParametricEqualizerAudioProcessor()
+        processors.add(WeakReference(processor))
+        // Seed from the current state so a sink created after the user changed a band does
+        // not start silent, or worse, start on a stale curve.
+        if (_enabled.value) processor.applyProfile(_curve.value) else processor.disable()
+        return processor
+    }
+
     private fun apply(state: ParametricEqState) {
         _enabled.value = state.enabled
         _curve.value = state.curve
-        if (state.enabled) {
-            processor.applyProfile(state.curve)
-        } else {
-            processor.disable()
+
+        val iterator = processors.iterator()
+        while (iterator.hasNext()) {
+            val reference = iterator.next()
+            val processor = reference.get()
+            if (processor == null) {
+                // The owning player is gone; drop the entry so the list cannot grow.
+                processors.remove(reference)
+                continue
+            }
+            if (state.enabled) {
+                processor.applyProfile(state.curve)
+            } else {
+                processor.disable()
+            }
         }
     }
 

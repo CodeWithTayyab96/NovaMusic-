@@ -4702,7 +4702,11 @@ class MusicService :
                         // applied after it would no longer place its bands where the user
                         // asked. Nothing else in NovaMusic's chain is order-sensitive
                         // relative to it.
-                        arrayOf<AudioProcessor>(parametricEqController.processor),
+                        // One processor per sink, not one per app: the crossfade overlap
+                        // player builds a second sink through this same factory and runs
+                        // concurrently with the primary one, so sharing a single instance
+                        // would put two threads on one set of biquad delay lines.
+                        arrayOf<AudioProcessor>(parametricEqController.createProcessor()),
                         // These two must be passed positionally. The varargs overload of
                         // DefaultAudioProcessorChain appends a *fresh* pair of its own, which
                         // would leave the tuned instance below inert and put four processors
