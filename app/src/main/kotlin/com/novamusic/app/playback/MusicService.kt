@@ -50,6 +50,7 @@ import androidx.media3.common.Player.REPEAT_MODE_OFF
 import androidx.media3.common.Player.REPEAT_MODE_ONE
 import androidx.media3.common.Player.STATE_IDLE
 import androidx.media3.common.Timeline
+import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.SonicAudioProcessor
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
@@ -107,6 +108,7 @@ import com.novamusic.app.constants.EqualizerOutputGainMbKey
 import com.novamusic.app.constants.EqualizerSelectedProfileIdKey
 import com.novamusic.app.constants.EqualizerVirtualizerEnabledKey
 import com.novamusic.app.constants.EqualizerVirtualizerStrengthKey
+import com.novamusic.app.eq.ParametricEqController
 import com.novamusic.app.constants.EnableDiscordRPCKey
 import com.novamusic.app.constants.HideExplicitKey
 import com.novamusic.app.constants.HideVideoKey
@@ -257,6 +259,13 @@ class MusicService :
 
     @Inject
     lateinit var mediaLibrarySessionCallback: MediaLibrarySessionCallback
+
+    /**
+     * Owns the parametric EQ processor that goes into the audio chain. Injected rather than
+     * constructed here so the settings screen and the audio pipeline share one instance.
+     */
+    @Inject
+    lateinit var parametricEqController: ParametricEqController
 
     private lateinit var audioManager: AudioManager
     private var audioFocusRequest: AudioFocusRequest? = null
@@ -912,6 +921,14 @@ class MusicService :
                 desiredEqSettings.value = settings
                 applyEqSettingsToEffects(settings)
             }
+
+        // Re-apply the platform effects whenever the parametric EQ mode is toggled, so the
+        // two equalizers never stack. Turning the parametric EQ on bypasses the system EQ;
+        // turning it off restores the user's saved system-EQ settings, which are never
+        // modified by this feature.
+        // (StateFlow already suppresses duplicate emissions, so no distinctUntilChanged.)
+        parametricEqController.enabled
+            .collectLatest(scope) { applyEqSettingsToEffects(desiredEqSettings.value) }
 
         combine(
             currentFormat,
@@ -3504,6 +3521,19 @@ class MusicService :
 
     private fun applyEqSettingsToEffects(settings: EqSettings) {
         val eq = equalizer ?: return
+
+        // The parametric EQ is a separate, optional mode. While it is active the platform
+        // effects are held disabled so the two equalizers cannot stack. Nothing stored is
+        // changed: the system-EQ preferences keep their values and are applied again the
+        // moment the parametric EQ is switched off.
+        if (parametricEqController.enabled.value) {
+            runCatching { eq.enabled = false }
+            bassBoost?.let { bb -> runCatching { bb.enabled = false } }
+            virtualizer?.let { v -> runCatching { v.enabled = false } }
+            loudnessEnhancer?.let { le -> runCatching { le.enabled = false } }
+            return
+        }
+
         val caps = eqCapabilities.value
         val bandCount = caps?.bandCount ?: eq.numberOfBands.toInt()
         val minMb = caps?.minBandLevelMb ?: runCatching { eq.bandLevelRange.getOrNull(0)?.toInt() }.getOrNull() ?: -1500
@@ -4665,6 +4695,18 @@ class MusicService :
                 .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
                 .setAudioProcessorChain(
                     DefaultAudioSink.DefaultAudioProcessorChain(
+                        // Extra processors, which Media3 runs in the order given, before the
+                        // silence-skipping and speed processors below. The parametric EQ
+                        // goes first on purpose: SonicAudioProcessor can change playback
+                        // speed, and a speed change shifts the whole spectrum, so a curve
+                        // applied after it would no longer place its bands where the user
+                        // asked. Nothing else in NovaMusic's chain is order-sensitive
+                        // relative to it.
+                        arrayOf<AudioProcessor>(parametricEqController.processor),
+                        // These two must be passed positionally. The varargs overload of
+                        // DefaultAudioProcessorChain appends a *fresh* pair of its own, which
+                        // would leave the tuned instance below inert and put four processors
+                        // in the chain instead of three.
                         SilenceSkippingAudioProcessor(
                             1_500_000L,
                             0.35f,
