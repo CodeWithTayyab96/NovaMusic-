@@ -335,6 +335,10 @@ Special thanks to the upstream projects and people:
 - **OpenTune** (Arturo254/OpenTune) — the direct upstream base of this app
 - **InnerTune** / **ArchiveTune** — the original project lineage
 - **Vivi Music** — source of the Canvas API and inspiration
+- **Echo Music** (EchoMusicApp/Echo-Music) — the parametric EQ feature, including the
+  biquad filter, the audio processor, the profile parser and the profile storage, was
+  ported from this project under the GPL-3.0. Ported files keep their original Echo Music
+  headers.
 - **@Fabito02** — constant support, feedback, and ideas
 - **mostafaalagamy** — MetroList implementation
 - **Community translators** — making the app accessible worldwide
