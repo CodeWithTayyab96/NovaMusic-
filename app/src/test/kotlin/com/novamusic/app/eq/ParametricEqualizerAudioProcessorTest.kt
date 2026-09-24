@@ -13,7 +13,6 @@ package com.novamusic.app.eq
 
 import androidx.media3.common.C
 import androidx.media3.common.audio.AudioProcessor
-import androidx.media3.common.util.UnstableApi
 import com.novamusic.app.eq.audio.ParametricEqualizerAudioProcessor
 import com.novamusic.app.eq.data.ParametricEq
 import com.novamusic.app.eq.data.ParametricEqBand
@@ -29,7 +28,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-@OptIn(UnstableApi::class)
 class ParametricEqualizerAudioProcessorTest {
 
     // ------------------------------------------------------------------ pass-through
