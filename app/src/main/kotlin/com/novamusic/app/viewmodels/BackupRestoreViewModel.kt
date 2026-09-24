@@ -437,7 +437,9 @@ class BackupRestoreViewModel @Inject constructor(
         }
     }
 
-    private suspend fun writeSettingsToXml(context: Context, outputStream: java.io.OutputStream) {
+    // internal, not private, so BackupSettingsRoundTripTest can exercise the real exporter and
+    // restorer. Visibility only — the bodies are unchanged.
+    internal suspend fun writeSettingsToXml(context: Context, outputStream: java.io.OutputStream) {
         val prefs = context.dataStore.data.first().asMap()
         val serializer = android.util.Xml.newSerializer()
         serializer.setOutput(outputStream, "UTF-8")
@@ -480,7 +482,8 @@ class BackupRestoreViewModel @Inject constructor(
         serializer.flush()
     }
 
-    private suspend fun restoreSettingsFromXml(context: Context, inputStream: java.io.InputStream) {
+    // internal, not private — see writeSettingsToXml above.
+    internal suspend fun restoreSettingsFromXml(context: Context, inputStream: java.io.InputStream) {
         val content = inputStream.readBytes().toString(Charsets.UTF_8)
         if (content.isBlank()) return
 
