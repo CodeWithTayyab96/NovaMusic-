@@ -56,3 +56,32 @@ internal object EqualizerJson {
         }
 }
 
+/**
+ * The system-equalizer settings that should actually be applied to the platform effects.
+ *
+ * The parametric EQ is a separate, optional mode and it takes precedence. While it is on, this
+ * returns a copy of [stored] with every stage switched off, so the two equalizers cannot stack:
+ * the platform effects stay attached to the session but do nothing.
+ *
+ * [stored] is never modified — this decides only what is *applied*, never what is *kept* — so
+ * switching the parametric EQ back off restores the user's system EQ exactly as they left it,
+ * including the band levels, bass boost, virtualizer and output gain they had saved.
+ *
+ * Pure and side-effect free, so the precedence rule is testable without a device and without a
+ * platform [android.media.audiofx.Equalizer].
+ */
+internal fun effectiveSystemEqSettings(
+    stored: EqSettings,
+    parametricEqEnabled: Boolean,
+): EqSettings =
+    if (!parametricEqEnabled) {
+        stored
+    } else {
+        stored.copy(
+            enabled = false,
+            outputGainEnabled = false,
+            bassBoostEnabled = false,
+            virtualizerEnabled = false,
+        )
+    }
+

@@ -3519,20 +3519,20 @@ class MusicService :
         applyEqSettingsToEffects(desiredEqSettings.value)
     }
 
-    private fun applyEqSettingsToEffects(settings: EqSettings) {
+    private fun applyEqSettingsToEffects(storedSettings: EqSettings) {
         val eq = equalizer ?: return
 
-        // The parametric EQ is a separate, optional mode. While it is active the platform
-        // effects are held disabled so the two equalizers cannot stack. Nothing stored is
-        // changed: the system-EQ preferences keep their values and are applied again the
-        // moment the parametric EQ is switched off.
-        if (parametricEqController.enabled.value) {
-            runCatching { eq.enabled = false }
-            bassBoost?.let { bb -> runCatching { bb.enabled = false } }
-            virtualizer?.let { v -> runCatching { v.enabled = false } }
-            loudnessEnhancer?.let { le -> runCatching { le.enabled = false } }
-            return
-        }
+        // The parametric EQ is a separate, optional mode, and it takes precedence. When it is
+        // on, the platform effects are driven with every stage disabled so the two equalizers
+        // cannot stack. The stored settings are not touched — only what is applied changes —
+        // so switching the parametric EQ back off restores the system EQ exactly as the user
+        // left it. The rule itself lives in effectiveSystemEqSettings(), where it is unit
+        // tested without needing a platform Equalizer.
+        val settings =
+            effectiveSystemEqSettings(
+                stored = storedSettings,
+                parametricEqEnabled = parametricEqController.enabled.value,
+            )
 
         val caps = eqCapabilities.value
         val bandCount = caps?.bandCount ?: eq.numberOfBands.toInt()
@@ -4696,28 +4696,31 @@ class MusicService :
                 .setAudioProcessorChain(
                     DefaultAudioSink.DefaultAudioProcessorChain(
                         // Extra processors, which Media3 runs in the order given, before the
-                        // silence-skipping and speed processors below. The parametric EQ
-                        // goes first on purpose: SonicAudioProcessor can change playback
-                        // speed, and a speed change shifts the whole spectrum, so a curve
-                        // applied after it would no longer place its bands where the user
-                        // asked. Nothing else in NovaMusic's chain is order-sensitive
-                        // relative to it.
-                        // One processor per sink, not one per app: the crossfade overlap
-                        // player builds a second sink through this same factory and runs
-                        // concurrently with the primary one, so sharing a single instance
-                        // would put two threads on one set of biquad delay lines.
+                        // silence-skipping and speed processors below. The parametric EQ goes
+                        // first on purpose: SonicAudioProcessor can change playback speed, and
+                        // a speed change shifts the whole spectrum, so a curve applied after it
+                        // would no longer place its bands where the user asked. Nothing else in
+                        // the chain is order-sensitive relative to it.
+                        //
+                        // One processor per sink, not one per app: the crossfade overlap player
+                        // builds a second sink through this same factory and runs concurrently
+                        // with the primary one, so sharing a single instance would put two
+                        // threads on one set of biquad delay lines.
                         arrayOf<AudioProcessor>(parametricEqController.createProcessor()),
-                        // These two must be passed positionally. The varargs overload of
-                        // DefaultAudioProcessorChain appends a *fresh* pair of its own, which
-                        // would leave the tuned instance below inert and put four processors
-                        // in the chain instead of three.
-                        SilenceSkippingAudioProcessor(
-                            1_500_000L,
-                            0.35f,
-                            500_000L,
-                            10,
-                            150.toShort(),
-                        ),
+                        // Default thresholds, deliberately. This branch must not change how
+                        // silence skipping behaves for existing users.
+                        //
+                        // Note that the tuned thresholds previously written here never
+                        // actually took effect: the varargs overload of
+                        // DefaultAudioProcessorChain appends a fresh pair of its own, so the
+                        // tuned instance sat in the chain disabled and unreachable by
+                        // applySkipSilenceEnabled(). Making it live is a real behaviour
+                        // change and is kept separately on
+                        // fix/silence-skipping-tuned-thresholds.
+                        //
+                        // The two are still passed positionally, so the chain is
+                        // [eq, silenceSkipping, sonic] rather than four entries.
+                        SilenceSkippingAudioProcessor(),
                         SonicAudioProcessor(),
                     ),
                 ).build()
