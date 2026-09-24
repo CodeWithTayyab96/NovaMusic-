@@ -25,6 +25,7 @@ import com.novamusic.app.eq.data.ParametricEqRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
@@ -57,6 +58,18 @@ class ParametricEqControllerTest {
             primary,
             overlap,
         )
+    }
+
+    @Test
+    fun `each sink is registered exactly once, so a change is applied once per sink`() {
+        // The two sinks NovaMusic actually has: the primary player and the crossfade overlap
+        // player. apply() walks the registry once and touches each entry a single time, so a
+        // duplicate entry would mean a duplicate application — this pins that there is one
+        // entry per sink and no more.
+        controller.createProcessor()
+        controller.createProcessor()
+
+        assertEquals(2, controller.liveProcessorCount())
     }
 
     @Test

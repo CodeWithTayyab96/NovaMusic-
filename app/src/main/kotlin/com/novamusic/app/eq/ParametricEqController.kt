@@ -99,8 +99,16 @@ constructor(
         return processor
     }
 
-    private fun apply(state: ParametricEqState) {
-        _enabled.value = state.enabled
+    /**
+     * How many processors are still reachable by their audio sink.
+     *
+     * Exposed for tests: the invariant that matters is one registry entry per sink, because
+     * [apply] walks the registry once and touches each entry a single time — so "one entry per
+     * sink" is what makes a curve change land exactly once per sink.
+     */
+    internal fun liveProcessorCount(): Int = processors.count { it.get() != null }
+
+    private fun apply(state: ParametricEqState) {        _enabled.value = state.enabled
         _curve.value = state.curve
 
         val iterator = processors.iterator()
