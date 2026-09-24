@@ -58,4 +58,39 @@ data class LyricsEntity(
 internal fun effectiveLyricsOverride(
     entity: LyricsEntity?,
     showingTranslation: Boolean,
-): String? = if (showingTranslation) entity?.usableTranslatedLyrics else null
+): String? {
+    if (!showingTranslation) return null
+    if (entity == null) return null
+    if (entity.lyrics.isBlank() || entity.lyrics == LyricsEntity.LYRICS_NOT_FOUND) return null
+    val translated = entity.usableTranslatedLyrics ?: return null
+    return interleaveTranslation(original = entity.lyrics, translated = translated)
+}
+
+/**
+ * Puts each translated line directly beneath the original line it belongs to.
+ *
+ * The ORIGINAL timestamp is copied onto the translated line, so both stay attached to the
+ * same moment and the synced-lyrics highlight drives them together. The model is never
+ * asked to produce timing information: every stamp comes from the original text.
+ */
+internal fun interleaveTranslation(
+    original: String,
+    translated: String,
+): String {
+    val originalLines = original.split('\n')
+    val translatedLines = translated.split('\n')
+    val out = ArrayList<String>(originalLines.size + translatedLines.size)
+    for (index in originalLines.indices) {
+        val originalLine = originalLines[index]
+        out.add(originalLine)
+        val translatedLine = translatedLines.getOrNull(index)?.takeIf { it.isNotBlank() }
+        if (translatedLine != null) {
+            val stamp = TIMESTAMP_PREFIX_REGEX.find(originalLine)?.groupValues?.getOrNull(1)
+            out.add(if (stamp != null) "$stamp $translatedLine" else translatedLine)
+        }
+    }
+    return out.joinToString("\n")
+}
+
+/** Leading "[mm:ss.xx]" groups of a line, or null when the line carries no timestamp. */
+private val TIMESTAMP_PREFIX_REGEX = Regex("""^((?:\[[0-9]{1,2}:[0-9]{2}(?:\.[0-9]{1,3})?\])+)""")

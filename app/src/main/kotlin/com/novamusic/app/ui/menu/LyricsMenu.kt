@@ -61,6 +61,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import com.novamusic.app.utils.TranslatorLanguages
 import com.novamusic.app.utils.TranslatorLang
+import com.novamusic.app.translation.TranslationContractException
+import com.novamusic.app.translation.messageRes
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -438,7 +440,15 @@ fun LyricsMenu(
             }
         }
         var expanded by remember { mutableStateOf(false) }
-        var selectedLanguageCode by rememberSaveable { mutableStateOf("ENGLISH") }
+        // Default to the device language, not a hardcoded one.
+        var selectedLanguageCode by rememberSaveable {
+            mutableStateOf(
+                java.util.Locale.getDefault()
+                    .displayLanguage
+                    .uppercase()
+                    .replace(' ', '_')
+            )
+        }
         var isTranslating by remember { mutableStateOf(false) }
         val selectedLanguageName =
             languages.firstOrNull { it.code == selectedLanguageCode }?.name ?: selectedLanguageCode
@@ -466,7 +476,9 @@ fun LyricsMenu(
                         )
                     )
                 } else {
-                    TextButton(onClick = {
+                    // Both actions share one implementation; they differ only in whether
+                    // an existing cached translation may be reused.
+                    val startTranslation: (Boolean) -> Unit = fun(force: Boolean) {
                         val languageName = selectedLanguageName
 
                         // Reuse a stored translation for the SAME language rather than spending
@@ -474,7 +486,10 @@ fun LyricsMenu(
                         // identical translation was pure waste. Guarded by the entity's own
                         // usability rule (blank / LYRICS_NOT_FOUND are not translations).
                         val existingEntity = lyricsProvider()
+                        // A forced run must spend the request, so the reuse shortcut is
+                        // skipped: returning the cached value would defeat the point.
                         if (
+                            !force &&
                             canReuseStoredTranslation(
                                 storedTranslation = existingEntity?.usableTranslatedLyrics,
                                 storedLanguage = existingEntity?.translationLanguage,
@@ -482,7 +497,7 @@ fun LyricsMenu(
                             )
                         ) {
                             showTranslateDialog = false
-                            return@TextButton
+                            return
                         }
 
                         isTranslating = true
@@ -536,6 +551,7 @@ fun LyricsMenu(
                                                 songId = mediaMetadataProvider().id,
                                                 lines = contents.map { it.orEmpty() },
                                                 targetLanguage = languageName,
+                                                force = force,
                                             )
                                             .getOrThrow()
 
@@ -568,18 +584,26 @@ fun LyricsMenu(
                                 )
                                 showTranslateDialog = false
                             } catch (e: Exception) {
+                                // Structured translation failures get their own message;
+                                // anything else falls back to the generic one.
+                                val messageRes =
+                                    (e as? TranslationContractException)?.error?.messageRes()
+                                        ?: R.string.translation_failed
                                 Toast.makeText(
                                     context,
-                                    context.getString(R.string.translation_failed) + ": " + (e.localizedMessage
-                                        ?: e.toString()),
+                                    context.getString(messageRes),
                                     Toast.LENGTH_SHORT
                                 ).show()
                             } finally {
                                 isTranslating = false
                             }
                         }
-                    }) {
+                    }
+                    TextButton(onClick = { startTranslation(false) }) {
                         Text(stringResource(R.string.translate))
+                    }
+                    TextButton(onClick = { startTranslation(true) }) {
+                        Text(stringResource(R.string.retranslate))
                     }
                 }
             }

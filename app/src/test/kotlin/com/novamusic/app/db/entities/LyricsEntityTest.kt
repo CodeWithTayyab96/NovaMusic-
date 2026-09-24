@@ -71,9 +71,32 @@ class LyricsEntityTest {
     }
 
     @Test
-    fun translatedModeReturnsTheTranslationWhenOneExists() {
-        val entity = LyricsEntity("song", original, "Bonjour", "French")
-        assertEquals("Bonjour", effectiveLyricsOverride(entity, showingTranslation = true))
+    fun translatedModeShowsTheTranslationUnderItsOriginal() {
+        val entity = LyricsEntity("song", original, "Bonjour\nMonde", "French")
+        assertEquals(
+            "[00:01.00] Hello\n[00:01.00] Bonjour\n[00:05.00] World\n[00:05.00] Monde",
+            effectiveLyricsOverride(entity, showingTranslation = true),
+        )
+    }
+
+    @Test
+    fun everyTimestampSurvivesTheOriginalToTranslatedRoundTrip() {
+        // The model never produces timestamps: each stamp is copied from the original
+        // line, so timing information cannot be lost or invented.
+        val entity =
+            LyricsEntity(
+                id = "song",
+                lyrics = "[00:01.00] Hello\n[00:05.50] World\n[00:09.25] Again",
+                translatedLyrics = "Bonjour\nMonde\nEncore",
+                translationLanguage = "French",
+            )
+        val rendered = effectiveLyricsOverride(entity, showingTranslation = true)!!
+        assertEquals(
+            listOf("[00:01.00]", "[00:05.50]", "[00:09.25]"),
+            rendered.lines().filter { it.startsWith("[") }.map { it.substringBefore(" ") }
+                .distinct(),
+        )
+        assertTrue(rendered.contains("[00:09.25] Encore"))
     }
 
     @Test

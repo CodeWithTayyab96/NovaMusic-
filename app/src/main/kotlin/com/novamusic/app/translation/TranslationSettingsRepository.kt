@@ -12,7 +12,6 @@ package com.novamusic.app.translation
 import android.content.Context
 import com.novamusic.app.constants.OpenRouterApiKeyKey
 import com.novamusic.app.constants.OpenRouterBaseUrlKey
-import com.novamusic.app.constants.OpenRouterModelKey
 import com.novamusic.app.constants.TranslationTargetLanguageKey
 import com.novamusic.app.utils.dataStore
 import kotlinx.coroutines.flow.Flow
@@ -20,8 +19,20 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import androidx.datastore.preferences.core.edit
 
-/** Echo's current default. Used as a STARTING default only — the model is user-configurable. */
-const val DEFAULT_OPENROUTER_MODEL = "google/gemini-2.5-flash-lite"
+/**
+ * The ONLY model NovaMusic ever requests.
+ *
+ * Deliberately `openrouter/free`: it routes across the free-tier pool, so no credit is
+ * needed. `openrouter/auto` is a PAID router and must never appear anywhere in this app.
+ *
+ * Not user-editable by design — the free pool is the point of the feature, and letting
+ * the field drift to a paid model would silently break translation for anyone without
+ * credit.
+ */
+const val OPENROUTER_FREE_MODEL = "openrouter/free"
+
+/** Alias kept so existing references compile. The model is fixed, not configurable. */
+const val DEFAULT_OPENROUTER_MODEL = OPENROUTER_FREE_MODEL
 
 const val DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -57,8 +68,7 @@ class TranslationSettingsRepository(
             val stored = prefs[OpenRouterApiKeyKey]
             TranslationConfig(
                 apiKey = SecureKeyStore.decrypt(stored),
-                model = prefs[OpenRouterModelKey]?.takeIf { it.isNotBlank() }
-                    ?: DEFAULT_OPENROUTER_MODEL,
+                model = OPENROUTER_FREE_MODEL,
                 baseUrl = prefs[OpenRouterBaseUrlKey]?.takeIf { it.isNotBlank() }
                     ?: DEFAULT_OPENROUTER_BASE_URL,
                 targetLanguage = prefs[TranslationTargetLanguageKey]?.takeIf { it.isNotBlank() }
@@ -89,10 +99,6 @@ class TranslationSettingsRepository(
 
     suspend fun clearApiKey() {
         context.dataStore.edit { prefs -> prefs.remove(OpenRouterApiKeyKey) }
-    }
-
-    suspend fun setModel(model: String) {
-        context.dataStore.edit { prefs -> prefs[OpenRouterModelKey] = model.trim() }
     }
 
     suspend fun setBaseUrl(baseUrl: String) {

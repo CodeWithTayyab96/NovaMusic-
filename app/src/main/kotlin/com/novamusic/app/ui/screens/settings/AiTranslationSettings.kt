@@ -12,6 +12,7 @@ package com.novamusic.app.ui.screens.settings
 import android.content.Context
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import com.novamusic.app.ui.component.IconButton
 import androidx.compose.material3.TopAppBar
@@ -37,11 +38,14 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.novamusic.app.R
-import com.novamusic.app.translation.DEFAULT_OPENROUTER_MODEL
+import com.novamusic.app.translation.OpenRouterTranslationProvider
 import com.novamusic.app.translation.TranslationConfig
+import com.novamusic.app.translation.TranslationContractException
 import com.novamusic.app.translation.TranslationSettingsRepository
+import com.novamusic.app.translation.messageRes
 import com.novamusic.app.ui.component.PreferenceEntry
 import kotlinx.coroutines.launch
 
@@ -54,6 +58,10 @@ import kotlinx.coroutines.launch
  *
  * The decrypted API key is never rendered. The field shows a placeholder when configured and
  * only ever holds what the user is actively typing.
+ *
+ * The model is deliberately NOT editable: NovaMusic always targets the OpenRouter free pool.
+ * `openrouter/auto` is a paid router and would silently break translation for anyone without
+ * credit, so there is no field that can be set to it.
  */
 @Composable
 fun AiTranslationSettings(
@@ -67,8 +75,8 @@ fun AiTranslationSettings(
     val config by repository.config.collectAsStateWithLifecycle(initialValue = TranslationConfig())
 
     var showKeyDialog by remember { mutableStateOf(false) }
-    var showModelDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
+    var isTestingConnection by remember { mutableStateOf(false) }
     // Short-lived feedback only; never holds a key value.
     var message: String? by remember { mutableStateOf(null) }
 
@@ -104,9 +112,32 @@ fun AiTranslationSettings(
         )
 
         PreferenceEntry(
-            title = { Text(stringResource(R.string.openrouter_model)) },
-            subtitle = { Text(config.model) },
-            onClick = { showModelDialog = true },
+            title = { Text(stringResource(R.string.test_connection)) },
+            subtitle = {
+                Text(if (isTestingConnection) stringResource(R.string.loading) else stringResource(R.string.test_connection))
+            },
+            onClick = {
+                if (isTestingConnection) return@PreferenceEntry
+                scope.launch {
+                    isTestingConnection = true
+                    message = null
+                    // A throwaway provider: one tiny request, then discarded. It reads the
+                    // current configuration, so it tests exactly the key the user just saved.
+                    val result =
+                        OpenRouterTranslationProvider(
+                            configProvider = { repository.currentConfig() },
+                        ).testConnection()
+                    val failure = result.exceptionOrNull()
+                    message =
+                        when {
+                            result.isSuccess -> context.getString(R.string.test_connection_success)
+                            failure is TranslationContractException ->
+                                context.getString(failure.error.messageRes())
+                            else -> context.getString(R.string.test_connection_failed)
+                        }
+                    isTestingConnection = false
+                }
+            },
         )
 
         PreferenceEntry(
@@ -115,12 +146,26 @@ fun AiTranslationSettings(
             onClick = { showLanguageDialog = true },
         )
 
+        // Disclosure, not fine print: translation sends the lyric text off-device.
+        Text(
+            text = stringResource(R.string.ai_translation_privacy_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+        )
+
         message?.let { text ->
             Text(
                 text = text,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.fillMaxWidth(),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
             )
         }
     }
@@ -130,24 +175,26 @@ fun AiTranslationSettings(
             title = stringResource(R.string.openrouter_api_key),
             label = stringResource(R.string.openrouter_api_key),
             initialValue = "",
-            placeholder = if (config.isConfigured) {
-                stringResource(R.string.api_key_configured)
-            } else {
-                stringResource(R.string.api_key_not_configured)
-            },
+            placeholder =
+                if (config.isConfigured) {
+                    stringResource(R.string.api_key_configured)
+                } else {
+                    stringResource(R.string.api_key_not_configured)
+                },
             canClear = config.isConfigured,
             onDismiss = { showKeyDialog = false },
             onSave = { typed ->
                 scope.launch {
                     val ok = repository.setApiKey(typed)
                     showKeyDialog = false
-                    message = if (ok) {
-                        context.getString(R.string.api_key_saved)
-                    } else {
-                        // setApiKey returned false: nothing was written, so an existing key is
-                        // still intact. Say so rather than implying success.
-                        context.getString(R.string.api_key_save_failed)
-                    }
+                    message =
+                        if (ok) {
+                            context.getString(R.string.api_key_saved)
+                        } else {
+                            // setApiKey returned false: nothing was written, so an existing key is
+                            // still intact. Say so rather than implying success.
+                            context.getString(R.string.api_key_save_failed)
+                        }
                 }
             },
             onClear = {
@@ -157,26 +204,6 @@ fun AiTranslationSettings(
                     message = context.getString(R.string.api_key_cleared)
                 }
             },
-        )
-    }
-
-    if (showModelDialog) {
-        SecretValueDialog(
-            title = stringResource(R.string.openrouter_model),
-            label = stringResource(R.string.openrouter_model),
-            initialValue = config.model,
-            placeholder = DEFAULT_OPENROUTER_MODEL,
-            canClear = false,
-            masked = false,
-            onDismiss = { showModelDialog = false },
-            onSave = { value ->
-                scope.launch {
-                    // Never allow an accidental blank configuration.
-                    repository.setModel(value.ifBlank { DEFAULT_OPENROUTER_MODEL })
-                    showModelDialog = false
-                }
-            },
-            onClear = {},
         )
     }
 
@@ -203,7 +230,7 @@ fun AiTranslationSettings(
 }
 
 /**
- * Single-line value entry used for the model, the language, and — with [masked] — the API key.
+ * Single-line value entry used for the language and — with [masked] — the API key.
  *
  * The value is held only while the dialog is open and is cleared on dismiss.
  */
@@ -231,14 +258,16 @@ private fun SecretValueDialog(
                 label = { Text(label) },
                 placeholder = { Text(placeholder) },
                 singleLine = true,
-                visualTransformation = if (masked) {
-                    PasswordVisualTransformation()
-                } else {
-                    VisualTransformation.None
-                },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = if (masked) KeyboardType.Password else KeyboardType.Text,
-                ),
+                visualTransformation =
+                    if (masked) {
+                        PasswordVisualTransformation()
+                    } else {
+                        VisualTransformation.None
+                    },
+                keyboardOptions =
+                    KeyboardOptions(
+                        keyboardType = if (masked) KeyboardType.Password else KeyboardType.Text,
+                    ),
                 modifier = Modifier.fillMaxWidth(),
             )
         },

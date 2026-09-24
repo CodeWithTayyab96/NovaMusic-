@@ -616,6 +616,7 @@ NovaMusic will only extract your token, and everything else is stored locally.</
     <string name="update_text">Update</string>
     <!-- Translate UI strings -->
     <string name="translate">Translate</string>
+    <string name="retranslate">Retranslate</string>
     <string name="lyrics_view_original">Original</string>
     <string name="lyrics_view_translated">Translated</string>
     <string name="ai_translation">AI Translation</string>
@@ -918,4 +919,20 @@ NovaMusic will only extract your token, and everything else is stored locally.</
     <string name="checking">Checking…</string>
     <string name="up_to_date">Up to date</string>
     <string name="view_update">View update %1$s</string>
+
+    <!-- AI lyrics translation: failure messages and the third-party disclosure -->
+    <string name="translation_error_missing_key">Add your OpenRouter API key in Settings to translate lyrics.</string>
+    <string name="translation_error_unauthorized">OpenRouter rejected the API key. Check it in Settings.</string>
+    <string name="translation_error_forbidden">OpenRouter refused this request for your key.</string>
+    <string name="translation_error_balance">Your OpenRouter balance is negative. Add credit and try again.</string>
+    <string name="translation_error_rate_limited">Free-model limit reached. Try again later.</string>
+    <string name="translation_error_timeout">The translation request timed out. Try again.</string>
+    <string name="translation_error_network">No connection. Showing the original lyrics.</string>
+    <string name="translation_error_provider">OpenRouter is unavailable right now. Try again shortly.</string>
+    <string name="translation_error_invalid">The model returned an unusable translation. Showing the original lyrics.</string>
+    <string name="translation_error_language">Choose a target language first.</string>
+    <string name="test_connection">Test connection</string>
+    <string name="test_connection_success">Connected — the key works.</string>
+    <string name="test_connection_failed">Could not reach OpenRouter.</string>
+    <string name="ai_translation_privacy_note">Lyric text is sent to third-party free models, some of which log prompts.</string>
 </resources>

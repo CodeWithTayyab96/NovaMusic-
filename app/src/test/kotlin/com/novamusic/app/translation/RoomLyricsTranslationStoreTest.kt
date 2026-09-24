@@ -147,7 +147,7 @@ class RoomLyricsTranslationStoreTest {
         insertLyrics(SONG_ID, ORIGINAL)
         runBlocking { store.saveTranslation(SONG_ID, TRANSLATED, "English") }
 
-        val entity = runBlocking { store.get(SONG_ID) }
+        val entity = runBlocking { store.get(SONG_ID, "English") }
         assertEquals(ORIGINAL, entity?.lyrics)
         assertEquals(TRANSLATED, entity?.translatedLyrics)
         assertEquals("English", entity?.translationLanguage)
@@ -199,6 +199,6 @@ class RoomLyricsTranslationStoreTest {
             0,
             count("SELECT COUNT(*) FROM lyrics"),
         )
-        assertNull(runBlocking { store.get("no-such-song") })
+        assertNull(runBlocking { store.get("no-such-song", "English") })
     }
 }

@@ -29,6 +29,8 @@ sealed interface TranslationError {
         MissingApiKey,
         Unauthorized,
         Forbidden,
+        /** OpenRouter 402: the account balance is negative. */
+        InsufficientBalance,
         RateLimited,
         Timeout,
         NetworkUnavailable,
@@ -49,6 +51,11 @@ sealed interface TranslationError {
 
     data object Forbidden : TranslationError {
         override val kind = Kind.Forbidden
+    }
+
+    /** OpenRouter returned 402: the account balance is negative, not a bad key. */
+    data object InsufficientBalance : TranslationError {
+        override val kind = Kind.InsufficientBalance
     }
 
     /** [retryAfterSeconds] comes from the provider's Retry-After header when present. */

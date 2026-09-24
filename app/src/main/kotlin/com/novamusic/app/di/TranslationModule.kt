@@ -6,10 +6,9 @@
 package com.novamusic.app.di
 
 import android.content.Context
-import com.novamusic.app.db.MusicDatabase
 import com.novamusic.app.translation.LyricsTranslationStore
 import com.novamusic.app.translation.OpenRouterTranslationProvider
-import com.novamusic.app.translation.RoomLyricsTranslationStore
+import com.novamusic.app.translation.FileLyricsTranslationCache
 import com.novamusic.app.translation.TranslateLyricsUseCase
 import com.novamusic.app.translation.TranslationConfigSource
 import com.novamusic.app.translation.TranslationProvider
@@ -45,8 +44,8 @@ object TranslationModule {
     @Provides
     @Singleton
     fun provideLyricsTranslationStore(
-        database: MusicDatabase,
-    ): LyricsTranslationStore = RoomLyricsTranslationStore(database)
+        cache: FileLyricsTranslationCache,
+    ): LyricsTranslationStore = cache
 
     @Provides
     @Singleton

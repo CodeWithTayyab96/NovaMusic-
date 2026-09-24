@@ -13,7 +13,7 @@ import com.novamusic.app.db.entities.LyricsEntity
 
 /** Reads the stored lyrics row for a song. */
 interface LyricsTranslationStore {
-    suspend fun get(songId: String): LyricsEntity?
+    suspend fun get(songId: String, language: String): LyricsEntity?
 
     /**
      * Persists a completed translation.
@@ -54,7 +54,8 @@ sealed interface TranslationOutcome {
  * Translates lyrics, honouring the cache and persisting only complete results.
  *
  * Contract:
- * - a stored translation in the requested language is reused with ZERO provider requests;
+ * - a stored translation in the requested language is reused with ZERO provider requests,
+ *   unless [TranslateLyricsUseCase.invoke] is called with ;
  * - the original `lyrics` are never written;
  * - a translation is persisted only after its line count matches the input exactly;
  * - failures propagate the structured [TranslationError] unchanged, never a raw exception
@@ -69,24 +70,34 @@ class TranslateLyricsUseCase(
     private val provider: TranslationProvider,
     private val store: LyricsTranslationStore,
 ) {
+    /**
+     * @param force ignore any stored translation and translate again, overwriting whatever
+     *   was cached for this (song, language). Used by "Retranslate" — a cached result can be
+     *   poor, and the user needs a way to discard it without clearing the key or the song.
+     */
     suspend operator fun invoke(
         songId: String,
         lines: List<String>,
         targetLanguage: String,
+        force: Boolean = false,
     ): Result<TranslationOutcome> {
         if (targetLanguage.isBlank()) {
             return translationFailure(TranslationError.UnsupportedLanguage(""))
         }
 
         // 1. Reuse a stored translation for the SAME language. No network call.
-        val entity = store.get(songId)
-        val stored = entity?.usableTranslatedLyrics
-        if (stored != null && entity?.translationLanguage == targetLanguage) {
-            val cached = stored.lines()
-            // A cached value whose line count no longer matches the current lyrics is stale
-            // (the original was edited or refetched), so it is not reused.
-            if (cached.size == lines.size) {
-                return Result.success(TranslationOutcome.Cached(cached))
+        //    Skipped entirely when [force] is set: a forced run must spend the request and
+        //    replace the stored value, never return the value it is meant to replace.
+        if (!force) {
+            val entity = store.get(songId, targetLanguage)
+            val stored = entity?.usableTranslatedLyrics
+            if (stored != null && entity.translationLanguage == targetLanguage) {
+                val cached = stored.lines()
+                // A cached value whose line count no longer matches the current lyrics is stale
+                // (the original was edited or refetched), so it is not reused.
+                if (cached.size == lines.size) {
+                    return Result.success(TranslationOutcome.Cached(cached))
+                }
             }
         }
 

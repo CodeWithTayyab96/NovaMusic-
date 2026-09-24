@@ -31,6 +31,7 @@ import com.novamusic.app.extensions.zipInputStream
 import com.novamusic.app.extensions.zipOutputStream
 import com.novamusic.app.playback.MusicService
 import com.novamusic.app.playback.MusicService.Companion.PERSISTENT_QUEUE_FILE
+import com.novamusic.app.constants.OpenRouterApiKeyKey
 import com.novamusic.app.utils.dataStore
 import com.novamusic.app.utils.reportException
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -445,6 +446,9 @@ class BackupRestoreViewModel @Inject constructor(
         serializer.startTag(null, "Settings")
 
         for ((key, value) in prefs) {
+            // The OpenRouter credential is never exported or restored: it is a secret for
+            // someone else's account and must not follow a backup to another device.
+            if (key == OpenRouterApiKeyKey) continue
             val tagName = when (value) {
                 is Boolean -> "boolean"
                 is Int -> "int"

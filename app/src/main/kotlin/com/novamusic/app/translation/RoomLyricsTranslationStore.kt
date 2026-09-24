@@ -23,9 +23,9 @@ import kotlinx.coroutines.withContext
 class RoomLyricsTranslationStore(
     private val database: MusicDatabase,
 ) : LyricsTranslationStore {
-    override suspend fun get(songId: String): LyricsEntity? =
+    override suspend fun get(songId: String, language: String): LyricsEntity? =
         withContext(Dispatchers.IO) {
-            database.getLyricsById(songId)
+            database.getLyricsById(songId)?.takeIf { it.translationLanguage == language }
         }
 
     override suspend fun saveTranslation(

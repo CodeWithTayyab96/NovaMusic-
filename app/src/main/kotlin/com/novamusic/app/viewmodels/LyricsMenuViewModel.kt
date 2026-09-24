@@ -159,11 +159,13 @@ constructor(
         songId: String,
         lines: List<String>,
         targetLanguage: String,
+        force: Boolean = false,
     ): Result<List<String>> =
         translateLyricsUseCase(
             songId = songId,
             lines = lines,
             targetLanguage = targetLanguage,
+            force = force,
         ).map { outcome -> outcome.lines }
 
 }

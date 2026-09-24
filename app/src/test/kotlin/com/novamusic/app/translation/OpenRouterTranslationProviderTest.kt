@@ -130,7 +130,11 @@ class OpenRouterTranslationProviderTest {
         )
 
         val body = requestBody(request)
-        assertTrue("body must carry the configured model", body.contains(MODEL))
+        assertTrue("body must request the free router", body.contains(OPENROUTER_FREE_MODEL))
+        assertFalse(
+            "openrouter/auto is a paid router and must never be requested",
+            body.contains("openrouter/auto"),
+        )
         assertTrue("body must demand a JSON array", body.contains("JSON array"))
         assertTrue("body must contain the lyric lines", body.contains("Lyric line number 1"))
         assertFalse(
@@ -203,7 +207,8 @@ class OpenRouterTranslationProviderTest {
         val (provider, seen) = provider(status = HttpStatusCode.InternalServerError, body = "")
         val result = runBlocking { provider.translate(TranslationRequest(inputLines(), "English")) }
         assertEquals(TranslationError.Kind.ProviderUnavailable, kindOf(result))
-        assertEquals(1, seen.size)
+        // A 5xx is retried exactly once, then surfaced — never a loop.
+        assertEquals(2, seen.size)
     }
 
     @Test
@@ -211,7 +216,7 @@ class OpenRouterTranslationProviderTest {
         val (provider, seen) = provider(status = HttpStatusCode.ServiceUnavailable, body = "")
         val result = runBlocking { provider.translate(TranslationRequest(inputLines(), "English")) }
         assertEquals(TranslationError.Kind.ProviderUnavailable, kindOf(result))
-        assertEquals(1, seen.size)
+        assertEquals(2, seen.size)
     }
 
     // ────────────────────────── network / timeout ──────────────────────────

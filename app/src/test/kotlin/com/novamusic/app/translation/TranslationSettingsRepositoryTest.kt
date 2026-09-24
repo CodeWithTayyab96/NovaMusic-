@@ -46,7 +46,6 @@ class TranslationSettingsRepositoryTest {
         // DataStore is process-wide here, so reset between tests.
         runBlocking {
             repository.clearApiKey()
-            repository.setModel(DEFAULT_OPENROUTER_MODEL)
             repository.setBaseUrl(DEFAULT_OPENROUTER_BASE_URL)
             repository.setTargetLanguage(DEFAULT_TRANSLATION_TARGET_LANGUAGE)
         }
@@ -138,26 +137,19 @@ class TranslationSettingsRepositoryTest {
     // ─────────────────────────── other settings ───────────────────────────
 
     @Test
-    fun modelBaseUrlAndLanguageChangesAreReflected() {
-        runBlocking {
-            repository.setModel("some-vendor/some-model")
-            repository.setTargetLanguage("Urdu")
-        }
-        val config = currentConfig()
-        assertEquals("some-vendor/some-model", config.model)
-        assertEquals("Urdu", config.targetLanguage)
-        // Untouched settings keep their defaults.
-        assertEquals(DEFAULT_OPENROUTER_BASE_URL, config.baseUrl)
-    }
+    fun theModelIsAlwaysTheFreeRouterAndCannotBeChanged() {
+        // There is deliberately no setter: routing to a paid model would break
+        // translation for anyone without credit.
+        assertEquals("openrouter/free", OPENROUTER_FREE_MODEL)
+        assertEquals(OPENROUTER_FREE_MODEL, DEFAULT_OPENROUTER_MODEL)
+        assertEquals(OPENROUTER_FREE_MODEL, currentConfig().model)
 
-    @Test
-    fun aBlankModelFallsBackToTheDefault() {
-        runBlocking { repository.setModel("   ") }
-        assertEquals(
-            "a blank model must not become the active configuration",
-            DEFAULT_OPENROUTER_MODEL,
-            currentConfig().model,
-        )
+        runBlocking { repository.setTargetLanguage("Urdu") }
+        val config = currentConfig()
+        // Changing an unrelated setting must not move the model off the free pool.
+        assertEquals(OPENROUTER_FREE_MODEL, config.model)
+        assertEquals("Urdu", config.targetLanguage)
+        assertEquals(DEFAULT_OPENROUTER_BASE_URL, config.baseUrl)
     }
 
     @Test
@@ -169,9 +161,10 @@ class TranslationSettingsRepositoryTest {
     @Test
     fun theConfigurationFlowEmitsUpdatedValues() {
         runBlocking {
-            assertEquals(DEFAULT_OPENROUTER_MODEL, repository.config.first().model)
-            repository.setModel("flow/model")
-            assertEquals("flow/model", repository.config.first().model)
+            assertEquals(OPENROUTER_FREE_MODEL, repository.config.first().model)
+            repository.setTargetLanguage("Urdu")
+            assertEquals("Urdu", repository.config.first().targetLanguage)
+            assertEquals(OPENROUTER_FREE_MODEL, repository.config.first().model)
         }
     }
 

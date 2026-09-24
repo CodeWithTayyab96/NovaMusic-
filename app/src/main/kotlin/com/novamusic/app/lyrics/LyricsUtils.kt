@@ -213,7 +213,19 @@ object LyricsUtils {
             }
         }
 
-        return high.coerceIn(0, lines.lastIndex)
+        val last = high.coerceIn(0, lines.lastIndex)
+
+        // Several lines can share one timestamp: an original line and its translation are
+        // rendered as consecutive entries carrying the SAME time. The binary search above
+        // lands on the LAST of them, which would highlight only the companion line and mark
+        // the original as "already sung". Treat a timestamp group as one moment and report
+        // its FIRST line, so the highlight lands on the original and every line of the group
+        // is on the "current or upcoming" side of the index comparison.
+        var first = last
+        while (first > 0 && lines[first - 1].time == lines[last].time) {
+            first--
+        }
+        return first
     }
 
     /**

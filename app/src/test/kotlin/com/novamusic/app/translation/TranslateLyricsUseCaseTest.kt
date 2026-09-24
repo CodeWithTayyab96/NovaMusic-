@@ -346,7 +346,7 @@ class TranslateLyricsUseCaseTest {
         /** The row as it would now be persisted. */
         fun persisted(): LyricsEntity? = current
 
-        override suspend fun get(songId: String): LyricsEntity? = current
+        override suspend fun get(songId: String, language: String): LyricsEntity? = current
 
         override suspend fun saveTranslation(
             songId: String,
