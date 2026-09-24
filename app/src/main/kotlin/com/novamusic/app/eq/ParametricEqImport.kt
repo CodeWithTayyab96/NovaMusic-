@@ -11,6 +11,7 @@ package com.novamusic.app.eq
 import android.content.Context
 import android.net.Uri
 import com.novamusic.app.eq.data.ParametricEqParser
+import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import timber.log.Timber
 
@@ -62,21 +63,23 @@ fun readProfileText(context: Context, uri: Uri): Result<String> {
 /**
  * Reads at most [maxBytes] and returns null if the stream has more.
  *
- * Reading byte-by-byte rather than via `readBytes()` is deliberate: it bounds memory even
- * when the content provider reports a length we cannot trust.
+ * Reading in chunks rather than via `readBytes()` bounds memory even when the content
+ * provider reports a length we cannot trust. The bytes are accumulated and decoded once:
+ * decoding per chunk would corrupt any multi-byte UTF-8 character that straddles a chunk
+ * boundary, which is easy to hit with a non-ASCII profile name.
  */
 private fun InputStream.readCapped(maxBytes: Int): String? {
     val buffer = ByteArray(8 * 1024)
-    val out = StringBuilder()
+    val out = ByteArrayOutputStream()
     var total = 0
     while (true) {
         val read = read(buffer)
         if (read == -1) break
         total += read
         if (total > maxBytes) return null
-        out.append(String(buffer, 0, read, Charsets.UTF_8))
+        out.write(buffer, 0, read)
     }
-    return out.toString()
+    return out.toByteArray().toString(Charsets.UTF_8)
 }
 
 private const val TAG = "ParametricEqImport"
