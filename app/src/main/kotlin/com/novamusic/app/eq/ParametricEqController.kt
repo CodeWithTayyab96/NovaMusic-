@@ -108,7 +108,8 @@ constructor(
      */
     internal fun liveProcessorCount(): Int = processors.count { it.get() != null }
 
-    private fun apply(state: ParametricEqState) {        _enabled.value = state.enabled
+    private fun apply(state: ParametricEqState) {
+        _enabled.value = state.enabled
         _curve.value = state.curve
 
         val iterator = processors.iterator()
