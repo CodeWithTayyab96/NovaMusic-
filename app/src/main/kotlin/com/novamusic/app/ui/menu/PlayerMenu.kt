@@ -120,6 +120,7 @@ import com.novamusic.app.ui.component.MenuSurfaceSection
 import com.novamusic.app.ui.component.NewAction
 import com.novamusic.app.ui.component.NewActionGrid
 import com.novamusic.app.ui.component.TextFieldDialog
+import com.novamusic.app.ui.screens.settings.ParametricEqDialog
 import com.novamusic.app.utils.rememberPreference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -293,6 +294,13 @@ fun ColumnScope.PlayerMenu(
                 }
             },
         )
+    }
+
+    // The optional parametric EQ mode. Separate from the system equalizer above, and opened
+    // from the row right below it, so it is reachable from the same place.
+    var showParametricEqDialog by rememberSaveable { mutableStateOf(false) }
+    if (showParametricEqDialog) {
+        ParametricEqDialog(onDismiss = { showParametricEqDialog = false })
     }
 
     val nowPlayingTitle = remember(mediaMetadata.title) {
@@ -693,6 +701,14 @@ fun ColumnScope.PlayerMenu(
                             headlineContent = { Text(text = stringResource(R.string.equalizer)) },
                             leadingContent = { Icon(painter = painterResource(R.drawable.equalizer), contentDescription = null) },
                             modifier = Modifier.clickable { showEqualizerDialog = true },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        )
+
+                        ListItem(
+                            headlineContent = { Text(text = stringResource(R.string.parametric_eq)) },
+                            supportingContent = { Text(text = stringResource(R.string.parametric_eq_desc)) },
+                            leadingContent = { Icon(painter = painterResource(R.drawable.equalizer), contentDescription = null) },
+                            modifier = Modifier.clickable { showParametricEqDialog = true },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         )
 

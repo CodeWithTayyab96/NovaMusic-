@@ -50,6 +50,7 @@ import androidx.media3.common.Player.REPEAT_MODE_OFF
 import androidx.media3.common.Player.REPEAT_MODE_ONE
 import androidx.media3.common.Player.STATE_IDLE
 import androidx.media3.common.Timeline
+import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.SonicAudioProcessor
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
@@ -107,6 +108,7 @@ import com.novamusic.app.constants.EqualizerOutputGainMbKey
 import com.novamusic.app.constants.EqualizerSelectedProfileIdKey
 import com.novamusic.app.constants.EqualizerVirtualizerEnabledKey
 import com.novamusic.app.constants.EqualizerVirtualizerStrengthKey
+import com.novamusic.app.eq.ParametricEqController
 import com.novamusic.app.constants.EnableDiscordRPCKey
 import com.novamusic.app.constants.HideExplicitKey
 import com.novamusic.app.constants.HideVideoKey
@@ -257,6 +259,13 @@ class MusicService :
 
     @Inject
     lateinit var mediaLibrarySessionCallback: MediaLibrarySessionCallback
+
+    /**
+     * Owns the parametric EQ processor that goes into the audio chain. Injected rather than
+     * constructed here so the settings screen and the audio pipeline share one instance.
+     */
+    @Inject
+    lateinit var parametricEqController: ParametricEqController
 
     private lateinit var audioManager: AudioManager
     private var audioFocusRequest: AudioFocusRequest? = null
@@ -912,6 +921,14 @@ class MusicService :
                 desiredEqSettings.value = settings
                 applyEqSettingsToEffects(settings)
             }
+
+        // Re-apply the platform effects whenever the parametric EQ mode is toggled, so the
+        // two equalizers never stack. Turning the parametric EQ on bypasses the system EQ;
+        // turning it off restores the user's saved system-EQ settings, which are never
+        // modified by this feature.
+        // (StateFlow already suppresses duplicate emissions, so no distinctUntilChanged.)
+        parametricEqController.enabled
+            .collectLatest(scope) { applyEqSettingsToEffects(desiredEqSettings.value) }
 
         combine(
             currentFormat,
@@ -3502,8 +3519,21 @@ class MusicService :
         applyEqSettingsToEffects(desiredEqSettings.value)
     }
 
-    private fun applyEqSettingsToEffects(settings: EqSettings) {
+    private fun applyEqSettingsToEffects(storedSettings: EqSettings) {
         val eq = equalizer ?: return
+
+        // The parametric EQ is a separate, optional mode, and it takes precedence. When it is
+        // on, the platform effects are driven with every stage disabled so the two equalizers
+        // cannot stack. The stored settings are not touched — only what is applied changes —
+        // so switching the parametric EQ back off restores the system EQ exactly as the user
+        // left it. The rule itself lives in effectiveSystemEqSettings(), where it is unit
+        // tested without needing a platform Equalizer.
+        val settings =
+            effectiveSystemEqSettings(
+                stored = storedSettings,
+                parametricEqEnabled = parametricEqController.enabled.value,
+            )
+
         val caps = eqCapabilities.value
         val bandCount = caps?.bandCount ?: eq.numberOfBands.toInt()
         val minMb = caps?.minBandLevelMb ?: runCatching { eq.bandLevelRange.getOrNull(0)?.toInt() }.getOrNull() ?: -1500
@@ -4665,13 +4695,32 @@ class MusicService :
                 .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
                 .setAudioProcessorChain(
                     DefaultAudioSink.DefaultAudioProcessorChain(
-                        SilenceSkippingAudioProcessor(
-                            1_500_000L,
-                            0.35f,
-                            500_000L,
-                            10,
-                            150.toShort(),
-                        ),
+                        // Extra processors, which Media3 runs in the order given, before the
+                        // silence-skipping and speed processors below. The parametric EQ goes
+                        // first on purpose: SonicAudioProcessor can change playback speed, and
+                        // a speed change shifts the whole spectrum, so a curve applied after it
+                        // would no longer place its bands where the user asked. Nothing else in
+                        // the chain is order-sensitive relative to it.
+                        //
+                        // One processor per sink, not one per app: the crossfade overlap player
+                        // builds a second sink through this same factory and runs concurrently
+                        // with the primary one, so sharing a single instance would put two
+                        // threads on one set of biquad delay lines.
+                        arrayOf<AudioProcessor>(parametricEqController.createProcessor()),
+                        // Default thresholds, deliberately. This branch must not change how
+                        // silence skipping behaves for existing users.
+                        //
+                        // Note that the tuned thresholds previously written here never
+                        // actually took effect: the varargs overload of
+                        // DefaultAudioProcessorChain appends a fresh pair of its own, so the
+                        // tuned instance sat in the chain disabled and unreachable by
+                        // applySkipSilenceEnabled(). Making it live is a real behaviour
+                        // change and is kept separately on
+                        // fix/silence-skipping-tuned-thresholds.
+                        //
+                        // The two are still passed positionally, so the chain is
+                        // [eq, silenceSkipping, sonic] rather than four entries.
+                        SilenceSkippingAudioProcessor(),
                         SonicAudioProcessor(),
                     ),
                 ).build()

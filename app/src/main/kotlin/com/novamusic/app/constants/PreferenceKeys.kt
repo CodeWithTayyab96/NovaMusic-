@@ -162,6 +162,16 @@ val EqualizerVirtualizerStrengthKey = intPreferencesKey("equalizerVirtualizerStr
 val EqualizerSelectedProfileIdKey = stringPreferencesKey("equalizerSelectedProfileId")
 val EqualizerCustomProfilesJsonKey = stringPreferencesKey("equalizerCustomProfilesJson")
 
+// --- Parametric EQ (new, optional mode) ------------------------------------------------
+// Deliberately new keys: the system-equalizer keys above are left untouched, so existing
+// users keep their saved bands, profiles and enabled state across the upgrade. These are
+// DataStore preferences of a type the backup exporter already understands (Boolean, Float,
+// String), so they are included in export/restore with no change to BackupRestoreViewModel.
+val ParametricEqEnabledKey = booleanPreferencesKey("parametricEqEnabled")
+val ParametricEqPreampDbKey = floatPreferencesKey("parametricEqPreampDb")
+val ParametricEqBandsJsonKey = stringPreferencesKey("parametricEqBandsJson")
+val ParametricEqProfilesJsonKey = stringPreferencesKey("parametricEqProfilesJson")
+
 val MaxImageCacheSizeKey = intPreferencesKey("maxImageCacheSize")
 val SmartTrimmerKey = booleanPreferencesKey("smartTrimmer")
 val MaxSongCacheSizeKey = intPreferencesKey("maxSongCacheSize")

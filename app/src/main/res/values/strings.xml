@@ -935,4 +935,22 @@ NovaMusic will only extract your token, and everything else is stored locally.</
     <string name="test_connection_success">Connected — the key works.</string>
     <string name="test_connection_failed">Could not reach OpenRouter.</string>
     <string name="ai_translation_privacy_note">Lyric text is sent to third-party free models, some of which log prompts.</string>
+
+    <!-- Parametric EQ (optional mode, ported from Echo Music) -->
+    <string name="parametric_eq">Parametric EQ</string>
+    <string name="parametric_eq_desc">Shape the sound with up to 20 bands of your own</string>
+    <string name="parametric_eq_enable">Enable parametric EQ</string>
+    <string name="parametric_eq_preamp">Preamp</string>
+    <string name="parametric_eq_preamp_hint">Lower the preamp to leave headroom when bands are boosted.</string>
+    <string name="parametric_eq_reset">Reset</string>
+    <string name="parametric_eq_band">Band %1$d</string>
+    <string name="parametric_eq_frequency">Frequency</string>
+    <string name="parametric_eq_gain">Gain</string>
+    <string name="parametric_eq_q">Q</string>
+    <string name="parametric_eq_add_band">Add band</string>
+    <string name="parametric_eq_remove_band">Remove band</string>
+    <string name="parametric_eq_import">Import profile</string>
+    <string name="parametric_eq_import_failed">Could not import that profile</string>
+    <string name="parametric_eq_empty">No bands yet. Add one to start shaping the sound.</string>
+    <string name="parametric_eq_bypasses_system">While this is on, the system equalizer is bypassed so the two do not stack.</string>
 </resources>
