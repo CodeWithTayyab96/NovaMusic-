@@ -485,7 +485,17 @@ fun Lyrics(
             emptyList()
         } else if (lyrics.startsWith("[")) {
             val parsedLines = parseLyrics(lyrics)
-            parsedLines.map { entry ->
+            // A "["-prefixed string can still fail LRC parsing (mangled timestamps). Falling
+            // through to the synced branch produced an EMPTY list — a blank screen. Show the
+            // raw lines unsynced instead of nothing.
+            if (parsedLines.isEmpty()) {
+                lyrics
+                    .lines()
+                    .filter { it.isNotBlank() }
+                    .mapIndexed { index, line -> LyricsEntry(index * 100L, line.trim()) }
+            } else {
+                parsedLines
+            }.map { entry ->
                 val newEntry = LyricsEntry(entry.time, entry.text, entry.words)
                 if (romanizeJapaneseLyrics) {
                     if (isJapanese(entry.text) && !isChinese(entry.text)) {

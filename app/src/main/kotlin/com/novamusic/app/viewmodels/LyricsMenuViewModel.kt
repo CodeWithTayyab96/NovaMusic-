@@ -91,6 +91,22 @@ constructor(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val lyrics = lyricsHelper.getLyrics(mediaMetadata)
+                // Never overwrite GOOD stored lyrics with the LYRICS_NOT_FOUND sentinel: a
+                // transient provider outage would erase the original lyrics AND (because the
+                // row is deleted/recreated here) any stored translation with them. Keeping
+                // the previous row costs nothing and preserves retryability.
+                val replacedMeaningful = lyricsEntity != null &&
+                    lyricsEntity.lyrics.isNotBlank() &&
+                    lyricsEntity.lyrics != LyricsEntity.LYRICS_NOT_FOUND
+                if (replacedMeaningful && !LyricsHelper.isMeaningfulLyrics(lyrics)) {
+                    return@launch
+                }
+                // A refetch that returned the SAME lyrics must not rewrite the row: the
+                // delete+upsert below would silently drop any stored translation even
+                // though the original it was derived from did not change.
+                if (lyricsEntity != null && lyricsEntity.lyrics == lyrics) {
+                    return@launch
+                }
                 database.query {
                     lyricsEntity?.let(::delete)
                     upsert(LyricsEntity(mediaMetadata.id, lyrics))

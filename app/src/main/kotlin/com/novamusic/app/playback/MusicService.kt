@@ -200,6 +200,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -332,7 +333,18 @@ class MusicService :
             }.build()
     }
 
+    // Monotonic generation counter guarding every asynchronous queue application. A slow
+    // getInitialStatus/deferred-chunk job from a superseded playQueue call must never mutate
+    // the player after a newer queue was set (rapid queue switches otherwise interleave two
+    // queues' items — real queue corruption, not a theoretical race).
+    private val queueGeneration = java.util.concurrent.atomic.AtomicLong(0)
+    // Written only on the main thread; read from the IO dispatcher (saveQueueToDisk).
+    // @Volatile is sufficient: every write is a single reference assignment (no compound
+    // read-modify-write), and cross-queue ordering is owned by queueGeneration.
+    @Volatile
     private var currentQueue: Queue = EmptyQueue
+    // Read from the IO dispatcher (saveQueueToDisk) as well as the main thread.
+    @Volatile
     var queueTitle: String? = null
     private val persistentStateLock = Any()
     @Volatile
@@ -766,6 +778,11 @@ class MusicService :
                     .first() == null
             ) {
                 val lyrics = lyricsHelper.getLyrics(mediaMetadata)
+                // The LYRICS_NOT_FOUND sentinel is written deliberately as a tombstone:
+                // it stops this collector, the lyrics-screen auto-fetch and the queue
+                // preload from re-querying all providers on every track change for songs
+                // that simply have no lyrics. Manual refetch overwrites the tombstone and
+                // guards against destroying a good row (see LyricsMenuViewModel).
                 database.query {
                     upsert(
                         LyricsEntity(
@@ -1157,9 +1174,14 @@ class MusicService :
             updateNotification()
 
             if (items.size > initialChunk.size) {
+                // Generation captured NOW (restore already applied): if the user plays a
+                // different queue during the settle delay, this stale loader must not prepend
+                // restored items into that new queue.
+                val restoreGeneration = queueGeneration.get()
                 scope.launch(SilentHandler) {
                     delay(2000)
                     if (!isActive || player.mediaItemCount == 0) return@launch
+                    if (restoreGeneration != queueGeneration.get()) return@launch
                     if (windowStart > 0) {
                         player.addMediaItems(0, items.subList(0, windowStart))
                     }
@@ -1658,6 +1680,10 @@ class MusicService :
         suppressAutoPlayback = false
         currentQueue = queue
         queueTitle = null
+        // Invalidate any in-flight queue application from a PREVIOUS playQueue call BEFORE
+        // touching the player, so a slow async continuation can never interleave its items
+        // into the new queue.
+        val generation = queueGeneration.incrementAndGet()
         val permanentShuffle = dataStore.get(PermanentShuffleKey, false)
         if (!permanentShuffle) {
             player.shuffleModeEnabled = false
@@ -1677,6 +1703,8 @@ class MusicService :
                 withContext(Dispatchers.IO) {
                     queue.getInitialStatus().filterExplicit(dataStore.get(HideExplicitKey, false)).filterVideo(dataStore.get(HideVideoKey, false))
                 }
+            // A newer playQueue (or a stale job after process restore) must win.
+            if (generation != queueGeneration.get()) return@launch
             if (initialStatus.title != null) {
                 queueTitle = initialStatus.title
             }
@@ -1724,6 +1752,8 @@ class MusicService :
                         try {
                             delay(2000) // Allow UI to settle
                             if (!isActive) return@launch
+                            // The user may have switched queues during the settle delay.
+                            if (generation != queueGeneration.get()) return@launch
                             
                             // Add preceding items
                             if (windowStart > 0) {
@@ -1779,6 +1809,11 @@ class MusicService :
         val currentIndex = player.currentMediaItemIndex
         val currentMediaId = currentMediaMetadata.id
 
+        // Radio REPLACES the upcoming queue, so it takes a fresh generation now: any pending
+        // async queue job (a previous radio resolution, a next-page load, a deferred restore)
+        // becomes stale and must not mutate the player after this. Checked again after the
+        // network await below — the user may pick a different queue while radio resolves.
+        val radioGeneration = queueGeneration.incrementAndGet()
         scope.launch(SilentHandler) {
             val radioQueue = YouTubeQueue(
                 endpoint = WatchEndpoint(videoId = currentMediaId)
@@ -1786,6 +1821,7 @@ class MusicService :
             val initialStatus = withContext(Dispatchers.IO) {
                 radioQueue.getInitialStatus().filterExplicit(dataStore.get(HideExplicitKey, false)).filterVideo(dataStore.get(HideVideoKey, false))
             }
+            if (radioGeneration != queueGeneration.get()) return@launch
 
             if (initialStatus.title != null) {
                 queueTitle = initialStatus.title
@@ -1805,6 +1841,7 @@ class MusicService :
                 player.addMediaItems(currentIndex + 1, radioItems)
             }
 
+            if (radioGeneration != queueGeneration.get()) return@launch
             currentQueue = radioQueue
         }
     }
@@ -2139,6 +2176,8 @@ class MusicService :
     fun stopAndClearPlayback() {
         suppressAutoPlayback = true
         clearAutomix()
+        // Invalidate every pending async queue job: nothing may re-populate a cleared queue.
+        queueGeneration.incrementAndGet()
         currentQueue = EmptyQueue
         queueTitle = null
         clearStreamRefreshGuards()
@@ -2174,6 +2213,11 @@ class MusicService :
             return
         }
         suppressAutoPlayback = false
+        // Cancel a pending automix load first: its insert is position-based, and racing it
+        // against this insert could otherwise land a suggested track in the middle of the
+        // user's own "play next" items.
+        automixJob?.cancel()
+        automixJob = null
         player.addMediaItems(
             if (player.mediaItemCount == 0) 0 else player.currentMediaItemIndex + 1,
             items
@@ -3181,6 +3225,9 @@ class MusicService :
                     togetherLastAppliedQueueHash = desiredHash.ifBlank { localHash }
                     val startIndex = state.currentIndex.coerceIn(0, desiredItems.lastIndex)
                     suppressAutoPlayback = false
+                    // The remote state owns the queue now: stale local async jobs must not
+                    // mutate the timeline it just rebuilt.
+                    queueGeneration.incrementAndGet()
                     currentQueue =
                         com.novamusic.app.playback.queues.ListQueue(
                             title = getString(R.string.music_player),
@@ -3650,9 +3697,16 @@ class MusicService :
         currentQueue.hasNextPage() &&
         player.repeatMode == REPEAT_MODE_OFF
     ) {
+        // Capture the queue NOW: by the time the network page resolves, the user may have
+        // switched queues. Applying the stale page would append queue A's items after queue B
+        // replaced it — and B's own transition would then append the SAME page again
+        // (duplicate tail) because B still reports hasNextPage().
+        val pageQueue = currentQueue
+        val pageGeneration = queueGeneration.get()
         scope.launch(SilentHandler) {
             val mediaItems =
-                currentQueue.nextPage().filterExplicit(dataStore.get(HideExplicitKey, false)).filterVideo(dataStore.get(HideVideoKey, false))
+                pageQueue.nextPage().filterExplicit(dataStore.get(HideExplicitKey, false)).filterVideo(dataStore.get(HideVideoKey, false))
+            if (pageGeneration != queueGeneration.get()) return@launch
             if (player.playbackState != STATE_IDLE) {
                 player.addMediaItems(mediaItems.drop(1))
             } else {
@@ -4475,6 +4529,10 @@ class MusicService :
                         try {
                             val response = client.newCall(request).execute()
                             if (response.isSuccessful) {
+                                // The body/connection must be released even though we only asked
+                                // for HEAD metadata; leaking it held a pooled connection and
+                                // eventually starved OkHttp's connection pool under flaky fallbacks.
+                                runCatching { response.close() }
                                 Timber.i("Using JossRed URL as fallback for $mediaId: $alternativeUrl")
 
                                 // Guardar URL en caché con expiración de 5 minutos
@@ -4703,7 +4761,9 @@ class MusicService :
                 }
             }
 
-            CoroutineScope(Dispatchers.IO).launch {
+            // Lifecycle-safe: runs under the service scope (cancelled in onDestroy) instead of
+            // an ad-hoc detached scope that kept running (and holding the token) after teardown.
+            ioScope.launch {
                 try {
                     val song = database.song(mediaItem.mediaId).first()
                         ?: return@launch
@@ -4723,7 +4783,7 @@ class MusicService :
                 }
             }
 
-            CoroutineScope(Dispatchers.IO).launch {
+            ioScope.launch {
                 runCatching { registerRemoteListeningHistory(mediaItem.mediaId) }
             }
         }
@@ -4947,8 +5007,11 @@ class MusicService :
     override fun onDestroy() {
         super.onDestroy()
         unregisterBluetoothReceiver()
+        // Runs INLINE, not via scope.launch: the scope is cancelled at the end of this method,
+        // so a posted coroutine could be cancelled before it ever dispatched, leaking the
+        // Together sockets/heartbeat jobs it would have torn down.
         try {
-            scope.launch { stopTogetherInternal() }
+            kotlinx.coroutines.runBlocking { stopTogetherInternal() }
         } catch (_: Exception) {}
         try {
             DiscordPresenceManager.stop()

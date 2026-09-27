@@ -505,8 +505,13 @@ fun LyricsMenu(
 
                                 val translatedLyrics = withContext(Dispatchers.IO) {
                                     val lines = inputText.split("\n")
+                                    // Same LRC reality as LyricsUtils.LINE_REGEX: 1-2 digit
+                                    // minutes, optional fraction. The old pattern missed
+                                    // [00:35]-style lines, so their text was sent to the model
+                                    // WITH the timestamp attached and the rebuilt translation
+                                    // double-prefixed the stamp.
                                     val tsRegex =
-                                        Regex("^((?:\\[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?\\])+)")
+                                        Regex("^((?:\\[0-9]{1,2}:[0-9]{2}(?:\\.[0-9]+)?\\])+)")
                                     val contents = mutableListOf<String?>()
                                     val stampsFor = mutableListOf<String?>()
 

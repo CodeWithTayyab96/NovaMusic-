@@ -22,8 +22,8 @@ import com.novamusic.app.utils.dataStore
 import com.novamusic.app.utils.reportException
 import com.novamusic.app.utils.NetworkConnectivityObserver
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
@@ -48,11 +48,8 @@ constructor(
         )
 
     private val cache = LruCache<String, List<LyricsResult>>(MAX_CACHE_SIZE)
-    private var currentLyricsJob: Job? = null
 
     suspend fun getLyrics(mediaMetadata: MediaMetadata, preferredProviderOnly: Boolean = false): String {
-        currentLyricsJob?.cancel()
-
         val cached = cache.get(mediaMetadata.id)?.firstOrNull()
         if (cached != null) {
             GlobalLog.append(Log.DEBUG, "LyricsHelper", "Found lyrics in cache for ${mediaMetadata.title}")
@@ -105,6 +102,12 @@ constructor(
 
         val lyrics = deferred.await()
         scope.cancel()
+        // Cache only meaningful results under the mediaId key this function reads from.
+        // The sentinel must never be cached: it would block every retry for the process
+        // lifetime (transient offline/failure would stick).
+        if (isMeaningfulLyrics(lyrics)) {
+            cache.put(mediaMetadata.id, listOf(LyricsResult("fetch", lyrics)))
+        }
         return lyrics
     }
 
@@ -116,8 +119,6 @@ constructor(
         duration: Int,
         callback: (LyricsResult) -> Unit,
     ) {
-        currentLyricsJob?.cancel()
-
         val cacheKey = "$songArtists-$songTitle".replace(" ", "")
         cache.get(cacheKey)?.let { results ->
             results.forEach {
@@ -138,25 +139,27 @@ constructor(
 
         val allResult = mutableListOf<LyricsResult>()
         val providers = orderedProviders()
-        currentLyricsJob = CoroutineScope(SupervisorJob() + Dispatchers.IO).async {
-            providers.forEach { provider ->
-                if (provider.isEnabled(context)) {
-                    try {
-                        provider.getAllLyrics(mediaId, songTitle, songArtists, songAlbum, duration) lyricsCallback@{ lyrics ->
-                            if (!isMeaningfulLyrics(lyrics)) return@lyricsCallback
-                            val result = LyricsResult(provider.name, lyrics)
-                            allResult += result
-                            callback(result)
-                        }
-                    } catch (e: Exception) {
-                        reportException(e)
+        // Runs inline in the CALLER's coroutine (no detached SupervisorJob scope): cancelling
+        // the caller (LyricsMenuViewModel.cancelSearch) actually stops provider fetches and
+        // stops callbacks from firing into the already-reset results list. The previous
+        // detached scope leaked work that kept mutating UI state after cancellation.
+        providers.forEach { provider ->
+            if (provider.isEnabled(context)) {
+                try {
+                    provider.getAllLyrics(mediaId, songTitle, songArtists, songAlbum, duration) lyricsCallback@{ lyrics ->
+                        if (!isMeaningfulLyrics(lyrics)) return@lyricsCallback
+                        val result = LyricsResult(provider.name, lyrics)
+                        allResult += result
+                        callback(result)
                     }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    reportException(e)
                 }
             }
-            cache.put(cacheKey, allResult)
         }
-
-        currentLyricsJob?.join()
+        cache.put(cacheKey, allResult)
     }
 
     private fun PreferredLyricsProvider.toLyricsProvider(): LyricsProvider = when (this) {
@@ -190,34 +193,39 @@ constructor(
         return listOf(first) + baseProviders.filterNot { it == first }
     }
 
-    private fun isMeaningfulLyrics(lyrics: String): Boolean {
-        val normalized =
-            lyrics
-                .replace("\uFEFF", "")
-                .replace(INVISIBLE_CHARS_REGEX, "")
-                .trim { it.isWhitespace() || it == '\u00A0' }
-
-        if (normalized.isEmpty()) return false
-        if (normalized == LYRICS_NOT_FOUND) return false
-
-        val remaining =
-            TIMESTAMP_REGEX
-                .replace(normalized, "")
-                .replace(INVISIBLE_CHARS_REGEX, "")
-                .trim { it.isWhitespace() || it == '\u00A0' }
-
-        return remaining.any { !it.isWhitespace() && it != '\u00A0' }
-    }
-
     fun cancelCurrentLyricsJob() {
-        currentLyricsJob?.cancel()
-        currentLyricsJob = null
+        // Kept for API compatibility: getAllLyrics now runs in the caller's coroutine,
+        // so callers cancel it through their own job (LyricsMenuViewModel.cancelSearch).
     }
 
     companion object {
         private const val MAX_CACHE_SIZE = 3
         private val TIMESTAMP_REGEX = Regex("""\[[0-9]{1,2}:[0-9]{2}(?:\.[0-9]{1,3})?]""")
         private val INVISIBLE_CHARS_REGEX = Regex("""[\u200B\u200C\u200D\u2060\u00AD]""")
+
+        /**
+         * Whether [lyrics] carries actual lyric content rather than a blank/sentinel/timestamps-only
+         * placeholder. Public because every lyrics WRITER (refetch, auto-fetch, preload) must make
+         * the same "is this worth storing" decision before replacing a database row.
+         */
+        fun isMeaningfulLyrics(lyrics: String): Boolean {
+            val normalized =
+                lyrics
+                    .replace("\uFEFF", "")
+                    .replace(INVISIBLE_CHARS_REGEX, "")
+                    .trim { it.isWhitespace() || it == '\u00A0' }
+
+            if (normalized.isEmpty()) return false
+            if (normalized == LYRICS_NOT_FOUND) return false
+
+            val remaining =
+                TIMESTAMP_REGEX
+                    .replace(normalized, "")
+                    .replace(INVISIBLE_CHARS_REGEX, "")
+                    .trim { it.isWhitespace() || it == '\u00A0' }
+
+            return remaining.any { !it.isWhitespace() && it != '\u00A0' }
+        }
     }
 }
 

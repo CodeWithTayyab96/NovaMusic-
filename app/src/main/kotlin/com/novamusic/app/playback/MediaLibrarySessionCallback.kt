@@ -44,7 +44,7 @@ import com.novamusic.app.utils.get
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -60,7 +60,10 @@ constructor(
     val database: MusicDatabase,
     val downloadUtil: DownloadUtil,
 ) : MediaLibrarySession.Callback {
-    private val scope = CoroutineScope(Dispatchers.Main) + Job()
+    // SupervisorJob so one failed media-session command cannot cancel siblings; the callback
+    // is a process-lifetime singleton injected into the session, so application lifetime is
+    // the correct scope owner here (no service-lifecycle job is available at this layer).
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     var toggleLike: () -> Unit = {}
     var toggleStartRadio: () -> Unit = {}
     var toggleLibrary: () -> Unit = {}

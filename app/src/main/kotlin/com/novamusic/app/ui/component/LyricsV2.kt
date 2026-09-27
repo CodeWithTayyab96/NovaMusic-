@@ -233,7 +233,13 @@ fun LyricsV2(
         if (lyrics == null || lyrics == LYRICS_NOT_FOUND) return@remember emptyList()
         val parsed = when {
             isTtml(lyrics!!) -> parseTtml(lyrics!!)
-            lyrics!!.startsWith("[") -> parseLyrics(lyrics!!)
+            lyrics!!.startsWith("[") -> parseLyrics(lyrics!!).ifEmpty {
+                // Same blank-screen guard as Lyrics.kt: mangled timestamps must degrade to
+                // an unsynced view, never to an empty synced one.
+                lyrics!!.lines()
+                    .filter { it.isNotBlank() }
+                    .mapIndexed { index, line -> LyricsEntry(time = -1L, text = line.trim()) }
+            }
             else -> lyrics!!.lines()
                 .filter { it.isNotBlank() }
                 .mapIndexed { index, line ->

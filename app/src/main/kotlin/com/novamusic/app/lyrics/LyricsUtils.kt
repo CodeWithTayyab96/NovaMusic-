@@ -26,8 +26,12 @@ data class LyricsRomanizationPreferences(
 
 @Suppress("RegExpRedundantEscape")
 object LyricsUtils {
-    val LINE_REGEX = "((\\[\\d\\d:\\d\\d\\.\\d{2,3}\\] ?)+)(.+)".toRegex()
-    val TIME_REGEX = "\\[(\\d\\d):(\\d\\d)\\.(\\d{2,3})\\]".toRegex()
+    // Real-world LRC files use 1- or 2-digit minutes and the fractional part is OPTIONAL
+    // ("[00:35]text", "[1:05]text"). The previous patterns required two-digit minutes AND a
+    // fraction, so whole-second LRC (very common from KuGou/lrclib) parsed as EMPTY and the
+    // renderer showed a blank synced view for lyrics the fetcher had accepted.
+    val LINE_REGEX = "((\\[\\d{1,2}:\\d{2}(?:\\.\\d{1,3})?\\] ?)+)(.+)".toRegex()
+    val TIME_REGEX = "\\[(\\d{1,2}):(\\d{2})(?:\\.(\\d{1,3}))?\\]".toRegex()
 
     private val KANA_ROMAJI_MAP: Map<String, String> = mapOf(
         // Digraphs (Yōon - combinations like kya, sho)
@@ -182,7 +186,8 @@ object LyricsUtils {
                 val min = timeMatchResult.groupValues[1].toLong()
                 val sec = timeMatchResult.groupValues[2].toLong()
                 val milString = timeMatchResult.groupValues[3]
-                var mil = milString.toLong()
+                // The fraction is optional now; a missing group yields "" — treat as 0 ms.
+                var mil = milString.toLongOrNull() ?: 0L
                 if (milString.length == 2) {
                     mil *= 10
                 }

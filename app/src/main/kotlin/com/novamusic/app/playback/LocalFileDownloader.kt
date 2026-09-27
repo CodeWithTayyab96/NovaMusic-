@@ -25,6 +25,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -88,10 +91,14 @@ constructor(
     private val _progress = MutableStateFlow<Map<String, LocalDownloadState>>(emptyMap())
     val progress: StateFlow<Map<String, LocalDownloadState>> = _progress.asStateFlow()
 
+    // Application-lifetime scope for background maintenance. Deliberately NOT GlobalScope:
+    // it is a single instance with an explicit owner and its failure is isolated per job.
+    private val maintenanceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
     init {
         // One-time startup cleanup: drop MediaStore entries + Room flags for app
         // downloads whose file is missing, empty, or clearly not audio.
-        CoroutineScope(Dispatchers.IO).launch {
+        maintenanceScope.launch {
             runCatching { purgeCorruptedLocalFiles() }
         }
     }
@@ -302,7 +309,10 @@ constructor(
                                 if (resumeAttempts < MAX_RESUME_ATTEMPTS) {
                                     resumeAttempts++
                                     Log.w(TAG, "Stream interrupted for $songId at $bytesDownloaded bytes, retrying ($resumeAttempts/$MAX_RESUME_ATTEMPTS)...")
-                                    Thread.sleep(500L)
+                                    // delay() (not Thread.sleep): keeps the worker thread free
+                                    // and honours cancellation — a user cancel during backoff
+                                    // must abort promptly instead of sleeping through it.
+                                    delay(500L)
                                     continue
                                 } else throw e
                             }
@@ -337,7 +347,8 @@ constructor(
                             if (chunkRead == 0L && bytesDownloaded < contentLength) {
                                 if (resumeAttempts < MAX_RESUME_ATTEMPTS) {
                                     resumeAttempts++
-                                    Thread.sleep(500L)
+                                    // Cancellable backoff — see the interrupt branch above.
+                                    delay(500L)
                                     continue
                                 } else {
                                     throw IOException("Download incomplete: got $bytesDownloaded of $contentLength bytes for $songId")
@@ -422,12 +433,18 @@ constructor(
                     _progress.update { map -> map + (songId to completed) }
                     onProgress?.invoke(completed)
                 } catch (e: Exception) {
-                    runCatching { context.contentResolver.delete(uri, null, null) }
-                    runCatching {
-                        database.query {
-                            val current = getSongByIdBlocking(songId)?.song ?: return@query
-                            if (current.isLocal) {
-                                update(current.copy(isLocal = false, localPath = null))
+                    // Rollback must survive cancellation: a user-cancel arrives as a cancelled
+                    // coroutine, where any suspend call (database.query) throws immediately and
+                    // was silently swallowed by runCatching — leaving isLocal=true pointing at
+                    // the MediaStore row we just deleted. NonCancellable makes both steps run.
+                    withContext(kotlinx.coroutines.NonCancellable) {
+                        runCatching { context.contentResolver.delete(uri, null, null) }
+                        runCatching {
+                            database.query {
+                                val current = getSongByIdBlocking(songId)?.song ?: return@query
+                                if (current.isLocal) {
+                                    update(current.copy(isLocal = false, localPath = null))
+                                }
                             }
                         }
                     }
@@ -810,7 +827,12 @@ constructor(
     }
 }
 
-private fun sanitizeFileName(name: String): String =
+/**
+ * Neutralises filesystem-hostile characters in a user-visible name before it becomes part of
+ * a MediaStore DISPLAY_NAME. Internal (not private) so the path-traversal guarantee has a
+ * regression test.
+ */
+internal fun sanitizeFileName(name: String): String =
     name.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifBlank { "Unknown" }
 
 /**

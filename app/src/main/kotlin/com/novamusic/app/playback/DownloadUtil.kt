@@ -61,7 +61,11 @@ constructor(
     private val audioQuality by enumPreference(appContext, AudioQualityKey, AudioQuality.AUTO)
     private val preferredStreamClient by enumPreference(appContext, PlayerStreamClientKey, PlayerStreamClient.ANDROID_VR)
     private val settingsDataStore = appContext.dataStore
-    private val songUrlCache = HashMap<String, Pair<String, Long>>()
+    // ConcurrentHashMap: this cache is read/written from the playback data-source thread,
+    // WorkManager worker threads (downloads) AND regular IO coroutines. A plain HashMap can
+    // lose entries or worse under concurrent resize (the player and a download racing on the
+    // same song was enough to trigger it).
+    private val songUrlCache = java.util.concurrent.ConcurrentHashMap<String, Pair<String, Long>>()
     private val avoidStreamCodecs: Set<String> by lazy {
         if (deviceSupportsMimeType("audio/opus")) emptySet() else setOf("opus")
     }
@@ -223,12 +227,19 @@ constructor(
             )
         }
 
+    // Application-lifetime scope for one-shot startup work in this @Singleton. Explicitly
+    // owned (not a detached CoroutineScope(...) launch) so its lifetime is documented and
+    // SupervisorJob keeps a failed load from killing sibling jobs.
+    private val initScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
     init {
-        CoroutineScope(Dispatchers.IO).launch {
+        initScope.launch {
             val result = mutableMapOf<String, Download>()
             val cursor = downloadManager.downloadIndex.getDownloads()
-            while (cursor.moveToNext()) {
-                result[cursor.download.request.id] = cursor.download
+            cursor.use {
+                while (it.moveToNext()) {
+                    result[it.download.request.id] = it.download
+                }
             }
             downloads.value = result
         }
