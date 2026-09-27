@@ -337,6 +337,12 @@ class App : Application(), SingletonImageLoader.Factory {
 
         fun forgetAccount(context: Context) {
             CoroutineScope(Dispatchers.IO).launch {
+                // The InnerTube cookie is a credential: migrateFromDataStore() moved it
+                // into the Keystore-backed SecureCredentialStore, and every read of
+                // InnerTubeCookieKey resolves the secure value first. Clearing only the
+                // DataStore copy therefore left the encrypted cookie behind and the
+                // user stayed signed in after logout.
+                SecureCredentialStore.remove(InnerTubeCookieKey.name)
                 context.dataStore.edit { settings ->
                     settings.remove(InnerTubeCookieKey)
                     settings.remove(PoTokenKey)
@@ -346,6 +352,12 @@ class App : Application(), SingletonImageLoader.Factory {
                     settings.remove(AccountEmailKey)
                     settings.remove(AccountChannelHandleKey)
                 }
+                // Reset the in-memory auth state used by every InnerTube request
+                // immediately instead of waiting for the next DataStore emission.
+                // An empty cookie normalizes to null (see normalizeAuthValue()), so
+                // requests go out unauthenticated; visitorData/dataSyncId are kept —
+                // they are not credentials and LoginScreen regenerates them per login.
+                YouTube.authState = YouTube.authState.copy(cookie = null)
             }
         }
     }
